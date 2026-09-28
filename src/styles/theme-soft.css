@@ -1,0 +1,1397 @@
+/* Soft theme layer — loads after main.css and only overrides presentation.
+   No data-* attribute used by main.js event handlers is renamed, and main.css
+   itself is never edited — every visual change lives here.
+
+   Section 1: global "Soft Rounded" blue brand theme (--maroon* variables keep
+   their legacy names — main.css references them throughout — but now hold the
+   blue palette instead of the old maroon one).
+   Section 2: per-category accent system for the product placeholder icon and
+   the "จัดสเปคเอง" sidebar chips (a separate multi-hue family, independent of
+   the primary brand color above, kept so each category stays visually
+   distinct). */
+
+/* ============ Section 1: global blue brand theme ============ */
+:root {
+  --maroon: #3b82f6;
+  --maroon-dark: #2563eb;
+  --maroon-soft: #e3edfe;
+  --maroon-faint: #f4f8ff;
+  --background: #f5f7fb;
+  --panel: #ffffff;
+  --line: #e7ecf4;
+  --line-strong: #d7e0ee;
+  --text: #16202e;
+  --muted: #6b7788;
+  --shadow: 0 20px 45px rgba(59, 130, 246, 0.14);
+  /* Added for the "modernize the surface" pass: a shared motion curve so
+     hover/focus transitions feel like one system instead of ad hoc
+     durations, plus two extra shadow tiers - a light one for small
+     interactive elements (buttons, inputs) and a stronger one for a
+     pressed-forward hover state on primary actions. */
+  --transition: 180ms cubic-bezier(0.4, 0, 0.2, 1);
+  --shadow-sm: 0 6px 16px rgba(59, 130, 246, 0.14);
+  --shadow-button: 0 12px 26px rgba(37, 99, 235, 0.28);
+}
+
+body {
+  font-family: "IBM Plex Sans Thai", "Tahoma", sans-serif;
+}
+
+/* ============ Section 1b: modern surface polish ============
+   Everything below is still presentation only (per the file header rule) -
+   no markup, no data-* attributes, no layout/structure changes. It's
+   hover/focus motion, shadow depth and a couple of small default fixes
+   (unloaded font aside, the biggest was the skeleton shimmer - main.css
+   defines a nice animated gradient for it once, then a later rule in the
+   same file quietly flattens it back to a static gray block, so the
+   loading animation named "shimmer" hasn't actually shimmered). */
+
+/* Buttons already get a 160ms transition on background/border/color/
+   transform from main.css (line ~47) and a translateY(1px) press effect on
+   :active - add a matching hover lift with a soft shadow so pressing feels
+   like the reverse of releasing, instead of only the press half existing. */
+.primary-button,
+.secondary-button,
+.reset-build-button,
+.category-button {
+  transition: background var(--transition), border-color var(--transition), color var(--transition), transform var(--transition), box-shadow var(--transition);
+}
+
+.primary-button:hover:not(:disabled) {
+  box-shadow: var(--shadow-button);
+  transform: translateY(-1px);
+}
+
+.secondary-button:hover:not(:disabled),
+.reset-build-button:hover:not(:disabled) {
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+
+/* Cards get the same lift-on-hover language as buttons. main.css doesn't
+   transition these at all (its global button/a/input/select transition
+   rule doesn't cover div/article/li), so the shadow swap on .product-card:
+   hover currently happens instantly - add the motion and pair it with a
+   matching lift. */
+.product-card,
+.saved-build-card,
+.manual-category,
+.build-item,
+.compatibility-check {
+  transition: box-shadow var(--transition), transform var(--transition), border-color var(--transition);
+}
+
+.product-card:hover {
+  transform: translateY(-3px);
+}
+
+.saved-build-card:hover {
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-2px);
+}
+
+/* Text inputs/selects stayed at main.css's legacy 6px corner radius while
+   cards went to 20px and buttons to 14px - bump them to an in-between
+   radius so the whole page reads as one rounded-corner language instead of
+   two generations of it. The pill-shaped auth/search inputs (border-radius:
+   999px / 6px-0-0-6px paired with an attached button) are intentionally
+   left alone - they're already part of a different, deliberate shape. */
+.field input,
+.field select,
+.filters select,
+.admin-search input,
+.admin-user-password-input,
+.admin-users-table select {
+  border-radius: 10px;
+}
+
+/* Admin tables read as plain HTML tables right now - a hover highlight on
+   the row being read makes them feel like an actual data-management UI
+   instead of a static report. */
+.admin-table tbody tr {
+  transition: background var(--transition);
+}
+
+.admin-table tbody tr:hover {
+  background: var(--maroon-faint);
+}
+
+/* Restore the shimmer the skeleton-pulse animation was actually built for.
+   main.css defines it once with a moving gradient (line ~1171), then a
+   second, later rule in the same file (line ~2791) swaps the background to
+   a flat color for every skeleton element on the page - the animation still
+   runs, but animating background-position on a solid color moves nothing,
+   so loading states have shown a static gray block instead of a shimmer
+   since that second rule was added. */
+.skeleton-line,
+.loading-box,
+.loading-button {
+  background: linear-gradient(90deg, #eef2f9 0%, #e0e7f4 50%, #eef2f9 100%);
+  background-size: 220% 100%;
+}
+
+/* ============ Phase 2: หน้าสินค้า/จัดสเปค ============
+   Same rule as Section 1b - presentation only. Two of these are color
+   fixes, not just decoration: .product-card button and .pagination button
+   both render with a plain black border/text at rest right now (main.css
+   line ~2270 and ~1117 - old pre-rebrand leftovers that, unlike most of the
+   old maroon references, were never routed through a var() at all, so the
+   blue reskin never reached them). They only turn blue on hover/active.
+   Matching them to the brand color at rest, not just on interaction, is
+   the actual bug fix; the shadow/zoom/lift additions around them are the
+   decorative part. */
+.product-card button {
+  border-color: var(--maroon);
+  color: var(--maroon);
+}
+
+.pagination button,
+.admin-pagination button {
+  border-color: var(--maroon);
+  color: var(--maroon);
+}
+
+/* Same leftover-hardcode bug as above: .reset-build-button ("เริ่มต้นใหม่") sits
+   right next to .secondary-button ("บันทึกสเปค") in the save-build panel and is
+   meant to read as the same outlined style, but main.css gives it its own
+   pre-rebrand border (#c9a1a8, an old dusty-rose leftover) and a slightly
+   darker text color (--maroon-dark instead of --maroon) - the two buttons
+   only match once you hover one of them. Route both properties through the
+   same brand variable .secondary-button already uses, at rest. */
+.reset-build-button {
+  border-color: var(--maroon);
+  color: var(--maroon);
+}
+
+/* Product image: main.css already clips this box (overflow: hidden), so a
+   slight zoom on the image itself on card hover is free depth with no
+   layout risk - the card's own border/frame stays put. */
+.product-image img {
+  transition: transform var(--transition);
+}
+
+.product-card:hover .product-image img {
+  transform: scale(1.06);
+}
+
+/* ============ Phase 3: ระบบแอดมิน ============ */
+
+/* The rest of the site's outlined action buttons (primary/secondary/reset/
+   category) got a hover-lift in Section 1b already - extend the same
+   language to the remaining button families so every clickable button on
+   the site behaves the same way on hover, admin screens included. */
+.admin-row-actions button,
+.admin-search button,
+.filters button {
+  transition: background var(--transition), border-color var(--transition), color var(--transition), transform var(--transition), box-shadow var(--transition);
+}
+
+.admin-row-actions button:hover:not(:disabled),
+.admin-search button:hover:not(:disabled),
+.filters button:hover:not(:disabled) {
+  box-shadow: var(--shadow-sm);
+  transform: translateY(-1px);
+}
+
+/* Dashboard stat cards and the breakdown/editor panels next to them are
+   flat bordered boxes right now, unlike every other panel on the site
+   (which is in the shared rounded-corner list a few lines down and gets a
+   soft shadow from Section 1). Give them the same quiet elevation so the
+   admin dashboard doesn't look like a separate, older part of the app. */
+.admin-stat-grid article,
+.admin-dashboard-breakdown,
+.admin-editor {
+  box-shadow: var(--shadow-sm);
+}
+
+/* Account-status pill: add a small solid dot ahead of the label (a common
+   "status" convention) instead of relying on background tint alone to
+   signal active/disabled - background: currentColor means it automatically
+   picks up whichever of the two status colors below applies. */
+.admin-account-status {
+  align-items: center;
+  display: inline-flex;
+  gap: 6px;
+}
+
+.admin-account-status::before {
+  background: currentColor;
+  border-radius: 999px;
+  content: '';
+  flex-shrink: 0;
+  height: 6px;
+  width: 6px;
+}
+
+/* ============ Phase 4: เมนู/ส่วนหัว + มือถือ ============ */
+
+/* Nav links kept main.css's original sharp 4-5px corner radius while
+   everything else on the page moved to the 10-20px rounded language - round
+   them to match. (Per request, the active link's underline accent that used
+   to sit under this - a small white bar via ::after - was removed; the
+   background-tint highlight on .nav a.active from main.css is what now
+   shows which page is active on its own.) */
+.nav a {
+  border-radius: 10px;
+}
+
+/* "ตัวจัดสเปค" (mobile builder-toggle) sits right next to the pill-shaped
+   login button in the header - main.css only gives it a 5px radius, which
+   reads inconsistent beside it. */
+.builder-toggle {
+  border-radius: 999px;
+}
+
+/* Bugfix: the admin product editor sits in the right column of a CSS grid
+   row whose height is set by the (often very long, 50-per-page) product
+   list in the left column. With no positioning of its own the editor panel
+   only rendered at the very top of that tall row, so opening it while
+   scrolled down the list put it out of view above the viewport - reported
+   as "editor jumps to the top of the page". Sticking it under the topbar
+   (same pattern already used for .sidebar in main.css) keeps it in view at
+   whatever scroll position the admin was at when they clicked "แก้ไข". */
+.admin-editor {
+  align-self: start;
+  max-height: calc(100vh - 88px);
+  overflow-y: auto;
+  position: sticky;
+  top: 88px;
+}
+
+/* Big rounded corners on card-like containers (20px) */
+.summary,
+.manual-panel,
+.builder-panel,
+.cart-panel,
+.status-panel,
+.category-panel,
+.product-card,
+.admin-editor,
+.saved-build-card,
+.build-result,
+.empty-state,
+.loading-state,
+.admin-stat-grid article,
+.admin-dashboard-breakdown,
+.saved-build-items article,
+.build-item,
+.compatibility-check,
+.cart-item,
+.auth-dialog,
+.admin-panel,
+.profile-panel,
+.saved-build-list-panel {
+  border-radius: 20px;
+}
+
+/* Bugfix: the image preview box in the admin product editor was a fixed
+   160px-tall frame (main.css) with the photo forced to width:100%;
+   height:100% inside it. For a tall product photo that squeezed/cropped
+   most of the image out of view - clamping overflow only hid the excess
+   rather than showing the whole picture. Let the frame size itself to the
+   photo's real aspect ratio instead (capped so it can't get huge), so the
+   full image is always visible, just letterboxed/centered when needed. */
+.admin-image-preview {
+  border-radius: 20px;
+  height: auto;
+  max-height: 320px;
+  overflow: hidden;
+  padding: 10px;
+}
+
+.admin-image-preview img {
+  display: block;
+  height: auto;
+  margin: 0 auto;
+  max-height: 300px;
+  max-width: 100%;
+  width: auto;
+}
+
+/* Soft blue-tinted shadows on the primary floating surfaces */
+.summary,
+.manual-panel,
+.builder-panel,
+.cart-panel,
+.product-card,
+.auth-dialog {
+  box-shadow: var(--shadow);
+}
+
+.product-card:hover {
+  box-shadow: 0 16px 40px rgba(59, 130, 246, 0.2);
+}
+
+/* Regular buttons (14px) */
+.primary-button,
+.secondary-button,
+.reset-build-button,
+.search button,
+.filters button,
+.admin-search button,
+.admin-row-actions button,
+.pagination button,
+.admin-pagination button,
+.product-card button,
+.saved-build-card button,
+.category-button {
+  border-radius: 14px;
+}
+
+/* Capsule / pill elements stay fully rounded (999px) */
+.manual-category em {
+  border-radius: 999px;
+}
+
+/* Hardcoded accent hexes left over from the old maroon palette — these don't
+   read var(--maroon), so they need explicit overrides. Semantic colors
+   (pass/fail/warning states, delete/destructive actions, active/disabled
+   status badges) are intentionally left untouched. */
+.product-card:hover {
+  border-color: #bcd6fb;
+}
+
+.build-result {
+  background: linear-gradient(180deg, #ffffff 0%, #f4f8ff 100%);
+  border-color: #bcd6fb;
+}
+
+.saved-build-card:hover {
+  border-color: #bcd6fb;
+}
+
+.empty-state {
+  border-color: #bcd6fb;
+}
+
+.empty-mark {
+  border-color: #bcd6fb;
+}
+
+.auth-form input,
+.search input,
+.field input,
+.field select,
+.filters select {
+  border-color: var(--line-strong);
+}
+
+/* type="search" inputs (product/admin/users/audit search boxes) get their
+   own native OS/browser chrome — a rounded pill, an inner ring — that fights
+   with the custom border here and shows as a broken-looking capsule with a
+   stray ring. Resetting appearance makes it render as the plain styled input
+   main.css already defines. */
+input[type="search"] {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* The old maroon focus ring (hardcoded rgba, not a var — main.css never
+   themed it) still shows the previous brand color; match it to the new blue
+   brand color instead. */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 3px solid rgba(59, 130, 246, 0.28);
+  outline-offset: 2px;
+}
+
+/* Decorative "เลือก" eyebrow above the product-list heading — removed per
+   request. */
+.toolbar h2::before {
+  content: none;
+}
+
+/* "จัดสเปคเอง" row background for an already-picked category was still the
+   old maroon-family pale pink (#fff7f8) - override it to plain white for
+   readability (per request), instead of any tinted background.
+   Note: the picked-item card's real class is "manual-category-selected"
+   (one hyphenated token - see renderManualCategories in main.js), not a
+   separate "selected" class, so ".manual-category.selected" never actually
+   matched it and the old hardcoded pink from main.css kept winning. */
+.manual-category-selected {
+  background: #ffffff;
+}
+
+/* Sidebar section order was swapped per request — "ระบบจัดอัตโนมัติ"
+   (.builder-panel) now comes first in index.html, before "จัดสเปคเอง"
+   (.manual-panel). main.css still styles them for the OLD order (it puts
+   the divider border + zero top-margin on .builder-panel because it used
+   to be the second/lower panel, and zeroes .manual-panel's border-top
+   because it used to be first). Swap which panel gets the divider so the
+   visual seam still sits between the two panels instead of floating at the
+   very top of the sidebar. */
+.builder-panel {
+  border-top: 0;
+  margin-top: 0;
+}
+
+.manual-panel {
+  border-top: 8px solid #f5f6f8;
+  margin-top: 0;
+}
+
+/* The per-category product-count number (e.g. "125") used to sit as its own
+   grid column in each "จัดสเปคเอง" row, between the name and the "เพิ่ม"
+   button - moved instead to a subtitle under the category heading on the
+   product list ("CPU" / "N รายการ", per request). main.css's 4-column grid
+   (icon / name / count / button) needs to drop back to 3 columns now that
+   the count cell is gone, or the "เพิ่ม" button would land in the count's
+   42px-wide column instead of its own. Only the *unselected* row uses this
+   grid - the selected-item row switches to flex layout (.manual-category-
+   selected), which ignores grid-template-columns entirely, so this is safe
+   to change without affecting it. */
+.manual-category {
+  grid-template-columns: 40px minmax(0, 1fr) 58px;
+}
+
+/* Subtitle under the product-list heading ("CPU" / "สินค้าทั้งหมด") showing
+   how many results are in view - same number that used to live next to
+   each row in the "จัดสเปคเอง" list above. */
+.category-count {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  margin: 4px 0 0;
+}
+
+/* New-password field added to each "จัดการผู้ใช้" row, sitting inline with
+   the เปิดบัญชี/ปิดบัญชี/บันทึก buttons in .admin-row-actions (a flex row) -
+   give it a fixed, compact width instead of the browser default so it
+   doesn't dominate the row or force the buttons to wrap. */
+.admin-user-password-input {
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  min-height: 34px;
+  padding: 0 8px;
+  width: 130px;
+}
+
+/* "บันทึกสเปค / รีเซตสเปค" moved out of the auto-build card into its own
+   card at the very bottom of the sidebar (per request). Reusing the
+   .builder-panel class gives it the same white rounded card look (border,
+   radius, shadow, padding) as the two panels above for free, but that
+   also pulls in .builder-panel's margin-top:0 rule right above — add back
+   a normal gap above this third card, and drop .save-build-actions' own
+   top divider line (main.css styled it for sitting *inside* a panel,
+   under a form; here it's the panel's only content, so a stray line with
+   nothing above it to divide would just float at the top of the card). */
+.save-build-panel {
+  margin-top: 14px;
+}
+
+.save-build-panel .save-build-actions {
+  border-top: 0;
+  margin-top: 0;
+  padding-top: 0;
+}
+
+/* ============ Section 2: per-category accent system ============ */
+/* --- Per-category hue assignment (purple/violet/magenta family only) --- */
+.manual-category[data-manual-category="cpu"] .manual-icon,
+.image-placeholder[data-category="cpu"] {
+  --cat-hue: 250;
+}
+
+.manual-category[data-manual-category="motherboard"] .manual-icon,
+.image-placeholder[data-category="motherboard"] {
+  --cat-hue: 222;
+}
+
+.manual-category[data-manual-category="video-card"] .manual-icon,
+.image-placeholder[data-category="video-card"] {
+  --cat-hue: 318;
+}
+
+.manual-category[data-manual-category="memory"] .manual-icon,
+.image-placeholder[data-category="memory"] {
+  --cat-hue: 268;
+}
+
+.manual-category[data-manual-category="internal-hard-drive"] .manual-icon,
+.image-placeholder[data-category="internal-hard-drive"],
+.image-placeholder[data-category="storage"] {
+  --cat-hue: 300;
+}
+
+.manual-category[data-manual-category="power-supply"] .manual-icon,
+.image-placeholder[data-category="power-supply"] {
+  --cat-hue: 330;
+}
+
+.manual-category[data-manual-category="case"] .manual-icon,
+.image-placeholder[data-category="case"] {
+  --cat-hue: 236;
+}
+
+.manual-category[data-manual-category="cpu-cooler"] .manual-icon,
+.image-placeholder[data-category="cpu-cooler"] {
+  --cat-hue: 258;
+}
+
+.manual-category[data-manual-category="monitor"] .manual-icon,
+.image-placeholder[data-category="monitor"] {
+  --cat-hue: 285;
+}
+
+/* --- "จัดสเปคเอง" sidebar chip: faded/light badge by default, a touch
+   darker only for the row currently being browsed (per request - โลโก้
+   พื้นหลังให้จางลง และเมื่อกดเลือกให้เข้มขึ้นมานิดนึง). Previously this was
+   the other way round (vivid solid-blue badge by default, pale badge on
+   the active row) - inverted here so the badge itself now reinforces which
+   category is selected instead of relying only on the row's tint/border. */
+.manual-category[data-manual-category] .manual-icon {
+  align-items: center;
+  background: var(--maroon-faint);
+  border-radius: 12px;
+  display: flex;
+  justify-content: center;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.manual-category[data-manual-category]:hover .manual-icon {
+  background: var(--maroon-soft);
+}
+
+/* Active row's badge: one step darker than the default fill (not the full
+   vivid gradient - "เข้มขึ้นมานิดนึง" asked for a little more, not a lot
+   more) plus a soft inset shadow so it still reads as "pressed in". */
+.manual-category.active[data-manual-category] .manual-icon {
+  background: var(--maroon-soft);
+  box-shadow:
+    inset 0 1px 3px rgba(37, 99, 235, 0.18),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.manual-category[data-manual-category] .manual-icon svg {
+  color: var(--maroon);
+  display: block;
+  filter: none;
+  height: 30px;
+  margin: 0;
+  width: 30px;
+}
+
+/* --- Product-card image placeholder: small icon badge on a soft tinted
+   background instead of one solid color block filling the whole area. --- */
+.image-placeholder {
+  align-items: center;
+  background: hsl(var(--cat-hue, 250) 55% 95%);
+  color: hsl(var(--cat-hue, 250) 55% 40%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  justify-content: center;
+  padding: 18px;
+}
+
+.image-placeholder svg {
+  background: hsl(var(--cat-hue, 250) 62% 89%);
+  border-radius: 999px;
+  box-sizing: content-box;
+  height: 22px;
+  padding: 15px;
+  width: 22px;
+}
+
+.image-placeholder span {
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1.3;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+/* ============ Phase A: admin editor - structured spec fields ============
+   The category-specific fields main.js renders into [data-admin-spec-fields]
+   are plain <label> elements, which main.css already styles nicely one at a
+   time (.admin-form label) - but that rule says nothing about the *group*
+   they sit in here, so without this they'd stack with no breathing room
+   between them. Give the container the same grid+gap rhythm the rest of
+   .admin-form already uses. */
+.admin-spec-fields {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-spec-fields:empty {
+  display: none;
+}
+
+/* ============ Phase B: hero section (products page) ============ */
+
+.hero {
+  align-items: center;
+  background: linear-gradient(135deg, var(--maroon-dark) 0%, var(--maroon) 100%);
+  border-radius: 20px;
+  box-shadow: var(--shadow);
+  color: #ffffff;
+  display: flex;
+  gap: 32px;
+  margin-bottom: 24px;
+  overflow: hidden;
+  padding: 40px 36px;
+}
+
+.hero-copy {
+  flex: 1 1 380px;
+  max-width: 640px;
+}
+
+/* กล่องรูป: ใส่ perspective ให้ลูก (.hero-media) เอียงแบบ isometric ได้จริง
+   แทนที่จะเป็นภาพแบนราบตรง ๆ - จำลองมิติแบบภาพตัวอย่าง
+   หมายเหตุ: จงใจไม่ใส่พื้นหลัง/ลวดลายอะไรไว้ใน wrap นี้ - ปล่อยให้ไล่สีน้ำเงินของ
+   .hero เองโชว์ผ่านมุมที่ภาพเอียงเผยออกมา (เดิมเคยใส่ conic-gradient สีรุ้งไว้
+   เป็นแสงเรือง แต่พอเบลอในพื้นที่แคบ ๆ สีต่าง ๆ มันหักล้างกันจนออกมาเป็นสีขาว
+   ไม่ใช่สีน้ำเงินอมรุ้งอย่างที่ตั้งใจ เลยเอาออก) */
+.hero-media-wrap {
+  flex: 0 0 320px;
+  perspective: 1100px;
+  position: relative;
+}
+
+.hero-media {
+  border-radius: 16px;
+  box-shadow: 0 26px 50px rgba(0, 0, 0, 0.4);
+  height: 220px;
+  overflow: hidden;
+  position: relative;
+  transform: perspective(1100px) rotateY(-10deg) rotateX(4deg) scale(1.02);
+  transform-style: preserve-3d;
+  transition: transform 260ms ease;
+  z-index: 1;
+}
+
+.hero-media:hover {
+  transform: perspective(1100px) rotateY(-4deg) rotateX(2deg) scale(1.04);
+}
+
+.hero-media img {
+  display: block;
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.hero-copy h1 {
+  font-size: 2.1rem;
+  font-weight: 800;
+  margin-bottom: 12px;
+}
+
+.hero-copy p {
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 1rem;
+  line-height: 1.6;
+  margin-bottom: 22px;
+}
+
+.hero-copy strong {
+  font-weight: 800;
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.hero-actions .primary-button {
+  background: #ffffff;
+  color: var(--maroon-dark);
+}
+
+.hero-actions .primary-button:hover:not(:disabled) {
+  background: #eef4ff;
+}
+
+.hero-actions .secondary-button {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.55);
+  color: #ffffff;
+}
+
+.hero-actions .secondary-button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+@media (max-width: 900px) {
+  .hero {
+    flex-wrap: wrap;
+  }
+
+  .hero-media-wrap {
+    flex: 1 1 100%;
+    order: -1;
+  }
+
+  .hero-media {
+    height: 180px;
+    transform: none;
+  }
+
+  .hero-media:hover {
+    transform: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .hero {
+    padding: 28px 22px;
+  }
+
+  .hero-copy h1 {
+    font-size: 1.6rem;
+  }
+}
+
+/* ============ Phase C: brand mark ============ */
+
+.brand {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+}
+
+.brand-icon {
+  flex-shrink: 0;
+}
+
+/* ============ จัดสเปคเอง row redesign: "(i) N/1" badge, locked quantity
+   display, trash icon (per request/reference screenshots) ============ */
+
+/* Selected-row: the icon+"CPU" header duplicated the tag pill right below
+   it, so it was dropped (per request) - the "(i) N/1" badge that used to
+   sit in that header now rides along on the tag-pills line instead
+   (.cart-item-tags is already a flex row, so it just joins the other tags
+   as one more inline item). */
+/* On the tag-pills row (selected card), margin-left: auto pushes the "N/1"
+   text all the way to the far right edge instead of sitting flush against
+   the brand tag - the .cart-item-tags flex row stretches to the card's
+   full width (it's a single-column grid child of .manual-name), so there's
+   room to push against (per reference design). No effect in the
+   unselected row's grid layout, where .manual-status is already alone in
+   its own narrow column. */
+.manual-status {
+  align-items: center;
+  color: inherit;
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+/* Drop the boxed/pill frame main.css normally draws around the "N/1" text -
+   show it as plain text next to the (i) icon instead (per request). */
+.manual-category em {
+  background: none;
+  border: none;
+  min-height: 0;
+  padding: 0;
+}
+
+/* Selected-card title line: product name and its meta (e.g. socket) used to
+   stack on separate lines (.manual-name's grid gives every direct child its
+   own row) - wrapping them in one flex row instead lets them share a single
+   line, baseline-aligned, with a small separator dot ahead of the meta
+   (per reference design). */
+.cart-item-title-line {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cart-item-title-line .cart-item-meta::before {
+  content: '·';
+  margin-right: 6px;
+}
+
+.manual-category-footer {
+  flex-wrap: wrap;
+  gap: 10px 14px;
+}
+
+.manual-category-footer b {
+  margin-right: auto;
+}
+
+/* The remove action is now an icon-only trash button instead of a
+   "ลบสินค้า" text link - keep the existing destructive-red color (per the
+   codebase's convention of leaving semantic delete/danger colors untouched
+   through the blue re-theme), drop the underline, and give it a proper
+   click target. */
+.cart-item-remove {
+  align-items: center;
+  border-radius: 8px;
+  display: inline-flex;
+  justify-content: center;
+  padding: 5px;
+  text-decoration: none;
+}
+
+.cart-item-remove:hover {
+  background: #fdecee;
+}
+
+/* ============ Build-result diagram: reverted back to the original
+   2-column + center-icon layout per "ทำกลับไปเป็นแบบเดิม" ============
+   Everything this section used to add (the colored per-category icon
+   badges, the PC-illustration-with-leader-lines panel, and its white-
+   background restyle) has been removed - renderBuildItemsDiagram in
+   main.js now renders plain .build-diagram/.build-col/.build-icon/
+   .build-item markup with no extra classes, so main.css's own original,
+   never-touched rules for those classes are what render it. Nothing left
+   here to override. */
+
+/* ============ Compatibility report: remove the center icon, back to a
+   plain 2-column grid ============
+   Per "เอา icon ออก" / "ปรับให้เหมือนตอนแรก" - main.js's own comment on
+   renderCompatibilityReport says this section "เดิมแสดงเป็นกริด 2 คอลัมน์
+   เฉยๆ" (originally just a plain 2-column grid) before a computer icon
+   was added in the center with connector-line stubs pointing to it.
+   main.css bakes the 3-column-with-center-icon grid in directly (this is
+   one class family theme-soft.css hadn't touched yet), so it's overridden
+   here instead of edited in main.css: hide the icon, collapse the grid
+   back to two equal columns, and drop the now-pointless connector-line
+   nubs and their margin offsets since there's no icon left to point to. */
+.compatibility-icon {
+  display: none;
+}
+
+.compatibility-diagram {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.compatibility-col-left .compatibility-check,
+.compatibility-col-right .compatibility-check {
+  margin: 0;
+}
+
+.compatibility-col-left .compatibility-check::after,
+.compatibility-col-right .compatibility-check::before {
+  display: none;
+}
+
+/* ============ Product grid: fixed 4 per row (per request) ============
+   main.css uses an auto-fill grid (repeat(auto-fill, minmax(230px/218px/
+   210px, 1fr))) at three width tiers, so the column count just falls out
+   of whatever fits - 5 per row at a typical desktop width. Force exactly 4
+   instead. Scoped to > 560px so the existing single-column mobile rule
+   (main.css, max-width: 560px) is left alone - a fixed 4-up grid would be
+   too cramped on a phone, and that wasn't what was asked for. */
+@media (min-width: 561px) {
+  .product-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* ============ Sidebar: wider column (per request) ============
+   main.css fixes the "จัดสเปคเอง"/"ระบบจัดอัตโนมัติ" sidebar at a flat
+   320px (.workspace's grid-template-columns) whenever the two-column
+   desktop layout is active - product names, tags and prices in the manual-
+   builder cards were feeling cramped at that width. Widen it to 380px.
+   Scoped to > 980px, the exact point main.css itself switches the sidebar
+   from a grid column to a fixed off-canvas drawer (own explicit width,
+   untouched here) - below that width this rule simply doesn't apply. */
+@media (min-width: 981px) {
+  .workspace {
+    grid-template-columns: 380px minmax(0, 1fr);
+  }
+}
+
+/* ============ Phase E: Premium elevation pass ============
+   Per request "อยากให้แก้ไข ธีมและ UI ให้ดูพรีเมียมและหรู" - explicitly kept
+   the existing blue brand (no hue swap) and scoped to the main product-
+   selection/build page only (hero, toolbar/search/filters, product grid,
+   and the "ระบบจัดอัตโนมัติ"/"จัดสเปคเอง" sidebar panels) per the follow-up
+   scope answer - richer layered shadows instead of flat ones, a serif
+   display font on the big section headings for a more editorial feel, and
+   a restrained gold accent used only at a few focal points (active sidebar
+   row, price, hero CTA hover ring) rather than a wholesale repaint. Cart/
+   checkout, the public gallery, admin, and auth pages are untouched. */
+
+:root {
+  --accent-gold: #b8935a;
+  --accent-gold-dark: #8f6f3f;
+  --accent-gold-soft: #f6ecd9;
+  --shadow-premium: 0 1px 2px rgba(15, 23, 42, 0.06), 0 30px 60px -20px rgba(37, 99, 235, 0.28);
+  --shadow-premium-sm: 0 1px 2px rgba(15, 23, 42, 0.05), 0 14px 30px -10px rgba(37, 99, 235, 0.2);
+}
+
+.hero-copy h1,
+.toolbar h2,
+.panel-title h2 {
+  font-family: "Noto Serif Thai", "IBM Plex Sans Thai", serif;
+}
+
+.hero-copy h1 {
+  letter-spacing: 0.01em;
+  line-height: 1.25;
+}
+
+/* กล่อง hero: ไล่สีเข้มขึ้นเป็นสามจุด (เดิมมีแค่ 2 จุด) + แสงฟุ้งจางๆ มุมซ้าย
+   บนแบบ soft spotlight ให้มีมิติมากกว่าพื้นเรียบสีเดียว, เงาลึกขึ้นแบบสองชั้น */
+.hero {
+  background: linear-gradient(135deg, #1e3a8a 0%, var(--maroon-dark) 48%, var(--maroon) 100%);
+  box-shadow: var(--shadow-premium);
+  position: relative;
+}
+
+.hero::before {
+  background: radial-gradient(circle at 12% 18%, rgba(255, 255, 255, 0.16), transparent 55%);
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+}
+
+.hero-copy,
+.hero-media-wrap {
+  position: relative;
+  z-index: 1;
+}
+
+/* ปุ่มหลักทั้งเว็บ (CTA ใน hero, ปุ่มจัดสเปคอัตโนมัติ ฯลฯ): เพิ่มวงแหวนสีทอง
+   จางๆ ตอน hover ต่อจากเงายกตัวเดิม ให้เป็นภาษากลางเดียวกันของปุ่มหลักแบบ
+   "พรีเมียม" โดยไม่เปลี่ยนสีพื้นปุ่มเอง */
+.primary-button:hover:not(:disabled) {
+  box-shadow: 0 0 0 3px rgba(184, 147, 90, 0.32), var(--shadow-button);
+}
+
+/* แถบค้นหา/ตัวกรอง: ยกเป็นการ์ดลอยเบาๆ ให้เข้าชุดกับการ์ดสินค้าด้านล่าง
+   แทนพื้นเรียบไม่มีเงา */
+.filters {
+  border-bottom: 0;
+  border-radius: 16px;
+  box-shadow: var(--shadow-premium-sm);
+}
+
+.search input:focus {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
+}
+
+/* การ์ดสินค้า: เงาสองชั้นนุ่มขึ้นตั้งแต่สถานะปกติ (ไม่ใช่แบนราบจนมี hover ถึง
+   ขยับ) แล้วยกตัวชัดเจนขึ้นตอน hover ให้รู้สึกเหมือนวางลอยอยู่บนพื้นผิวจริง */
+.product-card {
+  box-shadow: var(--shadow-premium-sm);
+}
+
+.product-card:hover {
+  box-shadow: var(--shadow-premium);
+  transform: translateY(-6px);
+}
+
+.price {
+  color: var(--maroon-dark);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+/* แผงข้าง (ระบบจัดอัตโนมัติ/จัดสเปคเอง/บันทึกสเปค): เงาลอยนุ่มขึ้นชุดเดียวกับ
+   การ์ดสินค้า ให้เป็นภาษาเดียวกันทั้งหน้า */
+.builder-panel,
+.manual-panel,
+.save-build-panel {
+  box-shadow: var(--shadow-premium-sm);
+}
+
+/* หัวข้อพาแนล ("ระบบจัดอัตโนมัติ" / "จัดสเปคเอง"): เส้นทองบางๆ ใต้ตัวอักษร
+   แทนตัวหนาเฉยๆ ให้ดูเป็นหมวดหมู่ทางการมากกว่า */
+.panel-title h2 {
+  padding-bottom: 10px;
+  position: relative;
+}
+
+.panel-title h2::after {
+  background: linear-gradient(90deg, var(--accent-gold) 0%, transparent 100%);
+  bottom: 0;
+  content: "";
+  height: 2px;
+  left: 0;
+  position: absolute;
+  width: 42px;
+}
+
+/* แถวหมวดหมู่ที่กำลังเปิดดูอยู่ใน "จัดสเปคเอง": เดิมมีแค่พื้นหลังฟ้าจางๆ ตอน
+   active เพิ่มเส้นขอบซ้ายสีทองบางๆ ให้เป็นจุดสังเกตชัดเจนขึ้นโดยไม่ต้องเปลี่ยน
+   เป็นกรอบเต็มกล่องสีเหลืองแบบภาพอ้างอิง (ตั้งใจคงโทนน้ำเงินเดิมไว้ตามที่
+   เลือก) - border-left เริ่มจากโปร่งใสไว้ก่อน กัน layout ขยับตอนสลับ active */
+.manual-category {
+  border-left: 3px solid transparent;
+}
+
+.manual-category.active {
+  border-left-color: var(--accent-gold);
+}
+
+/* ============ Phase F: Premium elevation pass — ตะกร้า/สรุปก่อนบันทึก +
+   บันทึกสเปค (หน้าประวัติ) ============
+   ขยายทิศทางเดียวกับ Phase E (คงธีมน้ำเงินเดิม, เงาสองชั้นแทนพื้นเรียบ, ฟอนต์
+   เซอริฟบนหัวข้อใหญ่, สีทองเป็นจุดเน้นแบบประหยัด) มาที่: สรุปยอดรวมในแถบข้าง,
+   การ์ดผลลัพธ์จัดสเปคอัตโนมัติ, การ์ดสรุปหลังบันทึกสำเร็จ, และรายการสเปคที่
+   บันทึกไว้ในหน้า "ประวัติ". ระหว่างทางเจอ hardcoded hex สีชมพู-แดงเก่าอีกจุด
+   ที่ตกหล่นจากการรีแบรนด์ (ยังไม่มีใครแก้มาก่อน) เลยแก้รวมไปด้วย ตามธรรมเนียม
+   เดิมของไฟล์นี้ที่ถือว่านี่คือบั๊ก ไม่ใช่แค่ของตกแต่ง สีสถานะผ่าน/ไม่ผ่าน/
+   เตือน (เขียว/แดง/เหลือง) ในผลตรวจความเข้ากันได้ไม่แตะ - เป็นสีความหมาย
+   (semantic) ตามธรรมเนียมเดิมของโค้ดนี้เช่นกัน. */
+
+/* บั๊กตกหล่นจากการรีแบรนด์: กรอบโฟกัส (คีย์บอร์ด) ของการ์ดประวัติยังเป็นสีแดง
+   -ชมพูเก่า (rgba(153, 15, 40, ...)) เพราะ hardcode ไว้ตรงๆ ไม่ผ่าน var()
+   เลยไม่เคยถูกทฤษฎีสีน้ำเงินตอนรีแบรนด์แตะ */
+.saved-build-card:focus-visible {
+  outline-color: rgba(37, 99, 235, 0.35);
+}
+
+.saved-build-header h3,
+.build-result h3,
+.saved-build-list-header h2 {
+  font-family: "Noto Serif Thai", "IBM Plex Sans Thai", serif;
+}
+
+/* เส้นคั่นบางๆ เหนือ "สรุปยอดรวม" ในแถบข้าง ให้รู้สึกเหมือนเส้นรวมยอดใน
+   ใบเสร็จ แทนที่จะลอยเป็นตัวเลขเฉยๆ */
+.manual-total {
+  border-top: 1px dashed var(--line-strong);
+}
+
+.manual-total strong,
+.build-total strong,
+.saved-build-header strong,
+.saved-build-card strong {
+  color: var(--maroon-dark);
+}
+
+/* การ์ดผลลัพธ์จัดสเปคอัตโนมัติ, การ์ดสรุปหลังบันทึกสำเร็จ, การ์ดในหน้า
+   "ประวัติ": เงาลอยนุ่มชุดเดียวกับการ์ดสินค้า/แผงข้าง (Phase E) แทนเส้นขอบ
+   เรียบๆ + ยกตัวชัดเจนขึ้นตอน hover เฉพาะการ์ดประวัติ (คลิกได้จริง) */
+.build-result,
+.saved-build-result,
+.saved-build-card {
+  box-shadow: var(--shadow-premium-sm);
+}
+
+.saved-build-card:hover {
+  box-shadow: var(--shadow-premium);
+  transform: translateY(-3px);
+}
+
+.build-meta span {
+  background: var(--maroon-faint);
+  border-color: var(--line-strong);
+}
+
+.saved-build-list-panel {
+  border-bottom: 0;
+}
+
+/* ============ Phase G: Premium elevation pass — สเปคทั้งหมด (gallery) +
+   แอดมิน + หน้าเข้าสู่ระบบ ============
+   ส่วนที่เหลือจาก Phase E/F เดียวกัน: เงาสองชั้นแทนกรอบเรียบๆ, ฟอนต์เซอริฟ
+   บนหัวข้อหลักของแต่ละหน้า (การ์ดย่อยในลิสต์ยังเป็นฟอนต์อ่านง่ายเหมือนเดิม
+   ไม่ทำเป็นเซอริฟหมดเพราะจะอ่านยากในการ์ดที่แน่นๆ). ระหว่างทางเจอ
+   hardcoded hex สีชมพู-แดงเก่าอีก 2 จุดที่การ์ด "สเปคทั้งหมด" (โฟกัส + hover
+   border) เหมือนที่เจอใน .saved-build-card ก่อนหน้านี้ทุกประการ - แก้พร้อมกัน
+   ในรอบนี้เลย. สีสถานะบัญชี (เปิด/ปิดใช้งาน) ในหน้าจัดการผู้ใช้ไม่แตะ - เป็น
+   สีความหมาย (semantic) เช่นเดียวกับผลตรวจความเข้ากันได้ */
+
+/* บั๊กตกหล่นจากการรีแบรนด์ (จุดที่ 3 ของบั๊กแบบนี้ในไฟล์นี้): การ์ด "สเปค
+   ทั้งหมด" ยังใช้สีแดง-ชมพูเก่าตอน hover/focus เหมือน .saved-build-card ก่อน
+   จะแก้ในเฟสก่อนหน้า */
+.gallery-card:hover {
+  border-color: #bcd6fb;
+}
+
+.gallery-card:focus-visible {
+  outline-color: rgba(37, 99, 235, 0.35);
+}
+
+.gallery-card {
+  border-radius: 20px;
+  box-shadow: var(--shadow-premium-sm);
+  transition: box-shadow var(--transition), transform var(--transition), border-color var(--transition);
+}
+
+.gallery-card:hover {
+  box-shadow: var(--shadow-premium);
+  transform: translateY(-3px);
+}
+
+/* หัวข้อหลักของแต่ละหน้า (ไม่ใช่การ์ดย่อย): ฟอนต์เซอริฟชุดเดียวกับ Phase E/F */
+.admin-header h2,
+.auth-dialog h2,
+.profile-header h2 {
+  font-family: "Noto Serif Thai", "IBM Plex Sans Thai", serif;
+}
+
+/* การ์ดสถิติ/สรุปในแดชบอร์ดแอดมิน: อัปเกรดจากเงาบางๆ (Section 1b) เป็นเงา
+   สองชั้นชุดเดียวกับการ์ดสินค้า/ประวัติ ให้เข้าเซ็ตเดียวกันทั้งเว็บ +
+   ตัวเลขสถิติตัวใหญ่เปลี่ยนเป็นสีน้ำเงินเข้มแบบเดียวกับราคา/ยอดรวมทุกจุด */
+.admin-stat-grid article,
+.admin-dashboard-breakdown,
+.admin-editor {
+  box-shadow: var(--shadow-premium-sm);
+}
+
+.admin-stat-grid strong {
+  color: var(--maroon-dark);
+}
+
+/* กล่องเข้าสู่ระบบ/สมัครสมาชิก: เงาลึกขึ้นอีกนิดให้เข้าชุดกับโทนพรีเมียมของ
+   ทั้งเว็บ (เดิมมีเงาเข้มอยู่แล้วเพราะเป็น modal ลอยเหนือหน้าเว็บ แค่ปรับให้
+   เป็นโทนน้ำเงินแทนสีเทาดำเฉยๆ) */
+.auth-dialog {
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08), 0 32px 70px -18px rgba(37, 99, 235, 0.35);
+}
+
+/* ============ Phase H: Premium elevation pass — ตารางแอดมิน + ฟอร์มแก้ไข
+   สินค้า + กล่องแชร์ลิงก์สเปค ============
+   ตาราง "จัดการสินค้า/จัดการผู้ใช้/กิจกรรมแอดมิน" ทั้งสามหน้าใช้ .admin-table
+   ร่วมจุดเดียวกัน (renderAdminProducts/renderAdminUsers/loadAdminAuditLogs
+   ใน main.js) - ยกเป็นการ์ดลอยเบาๆ + หัวตารางมีพื้นสีฟ้าจางแยกจากแถวข้อมูล +
+   แถวไฮไลต์ตอน hover ให้รู้สึกโต้ตอบได้ (เดิมเป็นเส้นตารางเรียบๆ ไม่มีการ
+   ตอบสนอง). ฟอร์มเพิ่ม/แก้ไขสินค้า: ช่องกรอกมี glow ตอนโฟกัสชุดเดียวกับช่อง
+   ค้นหาหน้าหลัก (Phase E, .search input:focus) แทนที่จะไม่มี feedback เลย.
+   กล่องแชร์ลิงก์สเปค (.saved-build-share ใน "จัดสเปคเอง" และหน้าประวัติ):
+   ยกพื้นหลัง/มุมโค้งให้ดูเป็นกล่องเด่นแยกจากเนื้อหารอบข้าง แทนเส้นคั่นบางๆ.
+
+   สิ่งที่ตั้งใจไม่แตะ: ปุ่ม "ลบ" ใน .admin-row-actions ยัง hover เป็นพื้นน้ำเงิน
+   เหมือนเดิม (พฤติกรรมเดิมของฟอร์มนี้ ไม่ใช่สีความหมายแบบ compatibility-check
+   จึงไม่ถือว่าเข้าเงื่อนไข "ห้ามแตะสีความหมาย" แต่ก็ไม่ใช่สิ่งที่ขอให้ปรับใน
+   รอบนี้ เลยเก็บของเดิมไว้) และสีสถานะบัญชี (เปิด/ปิดใช้งาน) ไม่แตะเหมือน
+   เฟสก่อนหน้า. .admin-table-wrap/.saved-build-share ไม่อยู่ในลิสต์มุมโค้ง 20px
+   ของ Section 1b (ตรวจแล้ว) เลยตั้งค่ามุมโค้งของตัวเองได้โดยไม่ชนกัน. */
+.admin-table-wrap {
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: var(--shadow-premium-sm);
+  padding: 4px 6px;
+}
+
+.admin-table th {
+  background: var(--maroon-faint);
+}
+
+.admin-table tbody tr {
+  transition: background var(--transition);
+}
+
+.admin-table tbody tr:hover {
+  background: var(--maroon-faint);
+}
+
+.admin-row-actions button,
+.admin-search button,
+.admin-pagination button {
+  transition: background var(--transition), color var(--transition), box-shadow var(--transition);
+}
+
+.admin-form input:focus,
+.admin-form textarea:focus,
+.admin-form select:focus,
+.admin-users-table select:focus,
+.admin-user-password-input:focus {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
+  outline: none;
+}
+
+.saved-build-share {
+  background: var(--maroon-faint);
+  border-bottom: none;
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+
+.manual-share .saved-build-share {
+  padding: 12px 14px;
+}
+
+.saved-build-listed-toggle + .saved-build-share {
+  border-top: none;
+  margin-top: 10px;
+}
+
+.saved-build-share-active input:focus {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
+  outline: none;
+}
+
+/* ============ Phase I: Premium elevation pass — หน้าโปรไฟล์ (บัญชีของฉัน)
+   ============
+   ตอนตรวจโค้ดรอบ Phase H พบว่า markup ของหน้านี้ (ลิงก์เมนู, แผงเนื้อหา,
+   ฟอร์มเปลี่ยนรหัสผ่าน) หายไปจาก index.html ทั้งหมด ทั้งที่ CSS ใน main.css
+   (.profile-panel/.profile-form) กับ JS ใน main.js (renderProfile,
+   submitChangePasswordForm, setView) รองรับพร้อมอยู่แล้ว - เข้าหน้านี้ไม่ได้
+   จริงมาตั้งแต่ต้น ไม่ใช่แค่ยังไม่จัดพรีเมียม ผู้ใช้ยืนยันให้เพิ่ม markup +
+   เปิด route กลับมาก่อน (ดู index.html + main.js) แล้วค่อยจัดพรีเมียมตามรอบ
+   นี้เลย. ฟอร์มเปลี่ยนรหัสผ่าน: ยกเป็นการ์ดลอยเบาๆ (เงาชุดเดียวกับ .filters
+   ของ Phase E) แทนที่จะลอยอยู่เฉยๆ ไม่มีกรอบ/เงา + ช่องกรอกมี glow ตอนโฟกัส
+   ชุดเดียวกับช่องอื่นๆ ทั้งเว็บ. */
+.profile-form {
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: var(--shadow-premium-sm);
+  padding: 20px;
+}
+
+.profile-form h3 {
+  font-size: 0.95rem;
+  margin: 0 0 2px;
+}
+
+.profile-form input:focus {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
+  outline: none;
+}
+
+/* ============ Phase J: Premium elevation pass — กล่องยืนยัน (confirm modal
+   ที่แทน window.confirm() เดิม) ============
+   เงาเดียวกับ .auth-dialog ของ Phase G (โทนน้ำเงินแทนสีเทาดำเฉยๆ) ให้เข้าชุด
+   เดียวกับ modal อื่นๆ ในเว็บ ไม่ต้องเพิ่มอะไรมากเพราะ .primary-button/
+   .secondary-button ในกล่องนี้ใช้ปุ่มเดียวกับทั้งเว็บอยู่แล้ว (เงา/hover ของ
+   Phase E ใช้ร่วมกันโดยอัตโนมัติ) */
+.confirm-dialog {
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08), 0 32px 70px -18px rgba(37, 99, 235, 0.35);
+}
+
+/* ============ Phase K: hero image เปลี่ยนเป็นภาพประกอบธีมอวกาศ ============
+   เปลี่ยนจากรูปถ่ายเคสพีซีจริง (pc-illustration.jpg บนพื้นขาว) เป็นภาพประกอบ
+   ธีมอวกาศ/แสงนีออนที่ผู้ใช้ส่งมา (hero-illustration-space.jpg) - ภาพนี้มีมิติ
+   และพื้นหลังของตัวเองอยู่แล้ว (เนบิวลา + เส้นแสง) ไม่ใช่ภาพสินค้าธรรมดาที่ต้อง
+   ใส่กรอบขาว/เอียงมุมช่วยให้ดูมีมิติแบบก่อนหน้า เลยปรับวิธีจัดใหม่ทั้งหมด:
+
+   1) เอาเอฟเฟกต์เอียง 3D (rotateY/rotateX) ออก - ภาพมีมุมกล้อง/แสงเงาในตัวอยู่
+      แล้ว เอียงซ้อนเข้าไปอีกทำให้ดูบิดเบี้ยวเกินจำเป็น เปลี่ยนเป็นแค่ลอยขึ้นเบาๆ
+      ตอน hover แทน (เหมือน .saved-build-card)
+   2) ขยายกล่องรูปให้กว้างขึ้น + สูงเท่าฝั่งข้อความ (align-self: stretch) แทนกรอบ
+      สูงคงที่ 220px เดิม - เข้ากับสัดส่วนภาพแนวนอนกว้างของภาพใหม่มากกว่า
+   3) ไล่จางขอบซ้ายของภาพด้วย mask-image ให้กลืนเข้ากับไล่สีน้ำเงินของ .hero
+      แทนที่จะเป็นกรอบสี่เหลี่ยมตัดเส้นตรงกลางฮีโร่ชัดเจน (ภาพเป็นโทนมืด/อวกาศ
+      ตัดกับพื้นน้ำเงินสด ถ้าไม่กลืนขอบจะดูเหมือนแปะสติกเกอร์ทับ) */
+.hero {
+  gap: 28px;
+}
+
+.hero-media-wrap {
+  align-self: stretch;
+  flex-basis: 420px;
+}
+
+.hero-media {
+  height: 100%;
+  min-height: 220px;
+  transform: none;
+  transition: transform var(--transition);
+}
+
+.hero-media:hover {
+  transform: translateY(-4px);
+}
+
+.hero-media img {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 14%);
+  mask-image: linear-gradient(to right, transparent, #000 14%);
+}
+
+@media (max-width: 900px) {
+  .hero-media {
+    min-height: 0;
+  }
+
+  .hero-media img {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+}
+
+/* ============ Phase L: hero ทั้งกล่องมีมิติ (ไม่ใช่แค่รูป) ============
+   ของเดิม (Phase K) แก้แค่ตัวรูปด้านขวาให้ดูมีมิติ - ส่วนข้อความด้านซ้ายกับ
+   กล่อง hero ทั้งใบยังแบนราบเหมือนเดิม ตามคำขอ "ให้ตรงส่วนนี้มันมีมิติทั้งหมด"
+   เลยเปลี่ยนใหม่: เอาภาพที่เคยขังอยู่ในกรอบเล็กด้านขวา มาแผ่เป็นฉากหลังเต็ม
+   พื้นที่กล่อง hero ทั้งกล่อง ซ้อนเป็นชั้นจริงๆ (ภาพ → ไล่สีน้ำเงินทับให้ข้อความ
+   อ่านออก → แสงฟุ้ง spotlight เดิม → ดาวจางๆ ฝั่งข้อความ → ข้อความ) แทนที่จะเป็น
+   "ข้อความ" กับ "กรอบรูป" คนละก้อนวางเคียงกันเฉยๆ + เพิ่ม tilt 3 มิติของกล่อง
+   ทั้งใบตอน hover (ของเดิม Phase K เอียงแค่ตัวรูปด้านในเท่านั้น)
+
+   ทำเฉพาะจอกว้าง ≥901px เพราะจอมือถือพื้นที่แคบเกินจะซ้อนภาพเต็มพื้นหลังใต้
+   ข้อความแล้วยังอ่านง่าย - จอมือถือเลยปล่อยไว้แบบกรอบรูปเดิมด้านบนข้อความ
+   ทุกอย่าง (ดู @media max-width:900px ด้านบน ซึ่งยังทำงานอยู่ตามปกติที่จอนั้น
+   เพราะ query นี้ครอบเฉพาะจอกว้างเท่านั้น) */
+@media (min-width: 901px) {
+  .hero {
+    perspective: 1400px;
+    transition: box-shadow 320ms ease, transform 320ms ease;
+  }
+
+  .hero:hover {
+    box-shadow: var(--shadow-premium), 0 44px 90px -30px rgba(37, 99, 235, 0.45);
+    transform: perspective(1400px) rotateX(1.4deg) rotateY(-1.6deg) scale(1.008);
+  }
+
+  .hero-media-wrap {
+    inset: 0;
+    position: absolute;
+    z-index: 0;
+  }
+
+  .hero-media {
+    border-radius: 0;
+    box-shadow: none;
+    height: 100%;
+    transform: none;
+    width: 100%;
+  }
+
+  .hero-media:hover {
+    transform: none;
+  }
+
+  .hero-media img {
+    height: 100%;
+    -webkit-mask-image: none;
+    mask-image: none;
+    object-fit: cover;
+    object-position: center 45%;
+    width: 100%;
+  }
+
+  .hero::after {
+    background: linear-gradient(100deg, var(--maroon-dark) 0%, rgba(37, 99, 235, 0.92) 20%, rgba(37, 99, 235, 0.55) 40%, rgba(37, 99, 235, 0.08) 60%, transparent 76%);
+    content: "";
+    inset: 0;
+    pointer-events: none;
+    position: absolute;
+    z-index: 1;
+  }
+
+  .hero::before {
+    z-index: 2;
+  }
+
+  .hero-copy {
+    position: relative;
+    z-index: 3;
+  }
+
+  /* ดาวจางๆ ฝั่งข้อความ ให้เข้ากับธีมอวกาศของภาพทั้งฉาก แทนที่จะมีแค่ไล่สีเรียบๆ
+     ด้านหลังตัวหนังสือ - จุดเล็กๆ บางมาก ไม่กวนตัวอ่าน วาง z-index ไว้ใต้
+     ตัวหนังสือของ .hero-copy เอง (แต่ยังอยู่เหนือไล่สี/spotlight เพราะ .hero-copy
+     ทั้งก้อนมี z-index สูงกว่าอยู่แล้ว) */
+  .hero-copy::before {
+    background-image:
+      radial-gradient(1.5px 1.5px at 15% 20%, rgba(255, 255, 255, 0.55), transparent),
+      radial-gradient(1.5px 1.5px at 35% 68%, rgba(255, 255, 255, 0.4), transparent),
+      radial-gradient(1px 1px at 55% 12%, rgba(255, 255, 255, 0.45), transparent),
+      radial-gradient(1.5px 1.5px at 78% 75%, rgba(255, 255, 255, 0.35), transparent),
+      radial-gradient(1px 1px at 22% 92%, rgba(255, 255, 255, 0.4), transparent);
+    content: "";
+    height: 240px;
+    left: -10px;
+    pointer-events: none;
+    position: absolute;
+    right: -10px;
+    top: -24px;
+    z-index: -1;
+  }
+}

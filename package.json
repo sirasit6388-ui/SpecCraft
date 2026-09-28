@@ -1,0 +1,19 @@
+{
+  "name": "pc-build",
+  "version": "0.1.0",
+  "description": "Phase 1 scaffold for Automatic PC Builder System.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "C:\\PROGRA~1\\nodejs\\node.exe server.js",
+    "dev": "C:\\PROGRA~1\\nodejs\\node.exe server.js",
+    "test": "C:\\PROGRA~1\\nodejs\\node.exe --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {}
+}

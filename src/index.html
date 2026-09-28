@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SpecCraft</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- theme-soft.css sets body { font-family: "IBM Plex Sans Thai", ... }
+         but the font itself was never actually loaded anywhere, so the page
+         silently fell back to Tahoma this whole time - this is what makes
+         that font-family declaration real. Noto Serif Thai is the "premium
+         elevation pass" display font (hero h1 / section h2 only, per
+         request) - loaded the same way. -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=Noto+Serif+Thai:wght@600;700&display=swap" />
+    <link rel="stylesheet" href="./styles/main.css?v=4" />
+    <link rel="stylesheet" href="./styles/theme-soft.css?v=24" />
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/">
+        <svg class="brand-icon" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
+          <rect x="7" y="7" width="10" height="10" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.6" />
+          <rect x="10" y="10" width="4" height="4" rx="0.5" fill="currentColor" />
+          <path stroke="currentColor" stroke-width="1.6" stroke-linecap="round" d="M9 2.5v2.5M12 2.5v2.5M15 2.5v2.5M9 19v2.5M12 19v2.5M15 19v2.5M2.5 9H5M2.5 12H5M2.5 15H5M19 9h2.5M19 12h2.5M19 15h2.5" />
+        </svg>
+        <span>SpecCraft</span>
+      </a>
+      <nav class="nav">
+        <a href="#products" data-view-link="products">
+          <svg class="nav-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11.5 12 4l8 7.5" /><path d="M6 10v9a1 1 0 0 0 1 1h3v-6h4v6h3a1 1 0 0 0 1-1v-9" /></svg>
+          <span>หน้าหลัก</span>
+        </a>
+        <a href="#history" data-view-link="history">
+          <svg class="nav-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></svg>
+          <span>ประวัติ</span>
+        </a>
+        <a href="#gallery" data-view-link="gallery">
+          <svg class="nav-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7.5" height="7.5" rx="1.4" /><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.4" /><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.4" /><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.4" /></svg>
+          <span>สเปคทั้งหมด</span>
+        </a>
+        <a href="#admin-dashboard" data-view-link="admin-dashboard" data-admin-dashboard-link hidden>แดชบอร์ด</a>
+        <a href="#admin" data-view-link="admin" data-admin-link hidden>จัดการสินค้า</a>
+        <a href="#admin-users" data-view-link="admin-users" data-admin-users-link hidden>จัดการผู้ใช้</a>
+        <a href="#admin-audit" data-view-link="admin-audit" data-admin-audit-link hidden>กิจกรรมแอดมิน</a>
+        <!-- ไม่ใส่ลิงก์เมนู "บัญชีของฉัน" ตามที่ขอ (เอาออกจากเมนู) - แต่หน้า
+             #profile / .profile-panel และฟอร์มเปลี่ยนรหัสผ่านด้านล่างยังอยู่
+             ครบ ยังเข้าถึงได้ตรงๆ ผ่าน setView('profile') หรือ URL #profile
+             ถ้าจะเปิดใช้อีกทีในอนาคตแค่เพิ่มลิงก์กลับมา ไม่ต้องแก้อะไรเพิ่ม -->
+      </nav>
+      <section class="auth-panel" data-auth-panel>
+        <button class="auth-open-button" type="button" data-auth-open>
+          <span class="auth-open-icon"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 20c0-4 4-6 8-6s8 2 8 6" /></svg></span>
+          <span>เข้าสู่ระบบ</span>
+        </button>
+      </section>
+      <button class="builder-toggle" type="button" data-builder-toggle aria-controls="builder" aria-expanded="false">ตัวจัดสเปค</button>
+    </header>
+
+    <section class="auth-modal" data-auth-modal hidden>
+      <div class="auth-dialog">
+        <button class="auth-close" type="button" data-auth-close aria-label="ปิด">×</button>
+        <h2>ยินดีต้อนรับ</h2>
+        <div class="auth-mode-tabs">
+          <button class="active" type="button" data-auth-mode="login">เข้าสู่ระบบ</button>
+          <button type="button" data-auth-mode="register">สมัครสมาชิก</button>
+        </div>
+        <form class="auth-form" data-auth-form>
+          <label>
+            <span>ชื่อผู้ใช้</span>
+            <input name="username" autocomplete="username" placeholder="ชื่อผู้ใช้" />
+          </label>
+          <label>
+            <span>รหัสผ่าน</span>
+            <input name="password" autocomplete="current-password" type="password" placeholder="รหัสผ่าน" />
+          </label>
+          <button type="submit" data-auth-submit>เข้าสู่ระบบ</button>
+        </form>
+        <div class="auth-divider"><span>หรือ</span></div>
+        <a class="auth-google-button" href="/api/auth/google" data-auth-google>
+          <svg viewBox="0 0 18 18" width="18" height="18" aria-hidden="true">
+            <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84c-.21 1.13-.84 2.09-1.8 2.73v2.27h2.92c1.7-1.57 2.68-3.88 2.68-6.64z"/>
+            <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.17l-2.92-2.27c-.81.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.71H.96v2.34C2.44 15.98 5.48 18 9 18z"/>
+            <path fill="#FBBC05" d="M3.97 10.71c-.18-.54-.28-1.11-.28-1.71s.1-1.17.28-1.71V4.95H.96A8.996 8.996 0 0 0 0 9c0 1.45.35 2.83.96 4.05l3.01-2.34z"/>
+            <path fill="#EA4335" d="M9 3.58c1.32 0 2.51.45 3.44 1.35l2.59-2.59C13.46.89 11.43 0 9 0 5.48 0 2.44 2.02.96 4.95l3.01 2.34C4.68 5.16 6.66 3.58 9 3.58z"/>
+          </svg>
+          <span>เข้าสู่ระบบด้วย Google</span>
+        </a>
+        <p class="auth-modal-status" data-auth-modal-status></p>
+      </div>
+    </section>
+
+    <section class="confirm-modal" data-confirm-modal hidden>
+      <div class="confirm-dialog">
+        <p class="confirm-message" data-confirm-message></p>
+        <div class="confirm-actions">
+          <button class="secondary-button" type="button" data-confirm-cancel>ยกเลิก</button>
+          <button class="primary-button" type="button" data-confirm-ok>ยืนยัน</button>
+        </div>
+      </div>
+    </section>
+
+    <main class="workspace" data-workspace>
+      <aside class="sidebar" id="builder">
+        <div class="sidebar-mobile-header">
+          <strong>ตัวจัดสเปค</strong>
+          <button type="button" data-builder-close aria-label="Close builder">ปิด</button>
+        </div>
+        <section class="builder-panel">
+          <div class="panel-title">
+            <h2>ระบบจัดอัตโนมัติ</h2>
+          </div>
+          <form class="builder-form" data-build-form>
+            <div class="segmented">
+              <label>
+                <input type="radio" name="mode" value="gaming" checked />
+                <span>เล่นเกม</span>
+              </label>
+              <label>
+                <input type="radio" name="mode" value="work" />
+                <span>ทำงาน</span>
+              </label>
+            </div>
+
+            <label class="field">
+              <span>ค่าย CPU</span>
+              <select name="cpuBrand">
+                <option value="auto">อัตโนมัติ</option>
+                <option value="AMD">AMD</option>
+                <option value="Intel">Intel</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span>งบประมาณ (บาท)</span>
+              <input name="budget" type="number" min="19000" step="500" placeholder="ขั้นต่ำ 19,000 บาท" required />
+            </label>
+
+            <button class="primary-button" type="submit">จัดสเปคอัตโนมัติ</button>
+          </form>
+        </section>
+
+        <section class="manual-panel">
+          <div class="panel-title">
+            <h2>จัดสเปคเอง</h2>
+            <button type="button" class="icon-reset-button" data-reset-build title="เริ่มต้นใหม่">
+              <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true" focusable="false">
+                <path d="M10 2v3.2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                <path d="M15.8 5.8A6.5 6.5 0 1 1 10 3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                <path d="M15.9 3.2l.2 3.2-3.2-.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              <span>เริ่มต้นใหม่</span>
+            </button>
+          </div>
+          <div class="manual-category-list" data-manual-categories></div>
+          <div class="manual-total" data-manual-total hidden>
+            <span>สรุปยอดรวม</span>
+            <strong data-manual-total-value>-</strong>
+          </div>
+          <div class="manual-share" data-manual-share hidden></div>
+        </section>
+
+        <section class="builder-panel save-build-panel">
+          <div class="save-build-listed" data-save-build-listed hidden></div>
+          <div class="save-build-actions">
+            <button class="secondary-button" type="button" data-save-build>บันทึกสเปค</button>
+            <button class="reset-build-button" type="button" data-reset-build>เริ่มต้นใหม่</button>
+          </div>
+        </section>
+
+      </aside>
+
+      <section class="content">
+        <section class="hero" data-view-panel="products">
+          <div class="hero-copy">
+            <h1>จัดสเปคคอมที่ใช่ ในงบที่ตั้งไว้</h1>
+            <p>เทียบราคาและเช็คความเข้ากันได้ของทุกชิ้นส่วนให้อัตโนมัติ จากสินค้ากว่า <strong data-hero-product-count>-</strong> รายการ จัดสเปคเสร็จได้ในไม่กี่คลิก</p>
+            <div class="hero-actions">
+              <button type="button" class="primary-button" data-hero-auto-build>เริ่มจัดสเปคอัตโนมัติ</button>
+              <button type="button" class="secondary-button" data-hero-browse>ดูสินค้าทั้งหมด</button>
+            </div>
+          </div>
+          <div class="hero-media-wrap">
+            <div class="hero-media">
+              <img src="./assets/hero-illustration-space.jpg" alt="ภาพประกอบพีซีธีมอวกาศพร้อมไฟ RGB และเอฟเฟกต์แสง" loading="lazy" />
+            </div>
+          </div>
+        </section>
+        <div class="toolbar" data-view-panel="products">
+          <div>
+            <h2 data-current-category>สินค้าทั้งหมด</h2>
+            <p class="category-count" data-current-category-count></p>
+          </div>
+          <form class="search" data-search-form>
+            <input name="search" type="search" placeholder="ค้นหาชื่อสินค้า, แบรนด์, รุ่น" />
+            <button type="submit">ค้นหา</button>
+          </form>
+        </div>
+
+        <form class="filters" data-filter-form data-view-panel="products">
+          <label>
+            <span>แบรนด์</span>
+            <select name="brand" data-filter-brand>
+              <option value="">แบรนด์ทั้งหมด</option>
+            </select>
+          </label>
+          <label>
+            <span>ซีรีส์</span>
+            <select name="series" data-filter-series>
+              <option value="">ซีรีส์ทั้งหมด</option>
+            </select>
+          </label>
+          <label>
+            <span>ซ็อกเก็ต</span>
+            <select name="socket" data-filter-socket>
+              <option value="">ซ็อกเก็ตทั้งหมด</option>
+            </select>
+          </label>
+          <button type="reset">ล้างตัวกรอง</button>
+        </form>
+
+        <section class="build-result" data-build-result data-view-panel="products" hidden></section>
+        <section class="saved-build-result" data-saved-build-result data-view-panel="products" hidden></section>
+        <section class="admin-panel" data-admin-panel data-view-panel="admin" hidden>
+          <div class="admin-header">
+            <div>
+              <h2>จัดการสินค้า</h2>
+              <p data-admin-status></p>
+            </div>
+            <div class="admin-actions">
+              <form class="admin-search" data-admin-search-form>
+                <input name="search" type="search" placeholder="ค้นหาชื่อสินค้า, แบรนด์, หมวดหมู่" />
+                <button type="submit">ค้นหา</button>
+              </form>
+              <button class="primary-button" type="button" data-admin-new>เพิ่มสินค้า</button>
+            </div>
+          </div>
+          <div class="admin-layout">
+            <div>
+              <div class="admin-product-list" data-admin-products>
+                <p class="muted">กำลังโหลดสินค้า...</p>
+              </div>
+              <nav class="admin-pagination" data-admin-pagination aria-label="Admin product pages" hidden></nav>
+            </div>
+            <section class="admin-editor" data-admin-editor hidden>
+              <div class="admin-editor-header">
+                <h3 data-admin-editor-title>เพิ่มสินค้า</h3>
+                <button class="text-button" type="button" data-admin-cancel>ปิด</button>
+              </div>
+              <form class="admin-form" data-admin-form>
+                <input name="id" type="hidden" />
+                <label><span>หมวดหมู่</span>
+                  <select name="category" required data-admin-category-select>
+                    <option value="cpu">CPU</option>
+                    <option value="motherboard">Mainboard</option>
+                    <option value="video-card">Graphic Card</option>
+                    <option value="memory">Memory</option>
+                    <option value="internal-hard-drive">Storage</option>
+                    <option value="power-supply">Power Supply</option>
+                    <option value="case">Case</option>
+                    <option value="cpu-cooler">CPU Cooler</option>
+                    <option value="monitor">Monitor</option>
+                    <option value="__other__">อื่นๆ (ระบุเอง)</option>
+                  </select>
+                </label>
+                <label data-admin-category-other-wrap hidden>
+                  <span>ระบุหมวดหมู่ (ตัวพิมพ์เล็ก คั่นด้วย -)</span>
+                  <input data-admin-category-other placeholder="เช่น case-fan" />
+                </label>
+                <label><span>แบรนด์</span><input name="brand" placeholder="AMD" /></label>
+                <label><span>ชื่อสินค้า</span><input name="name" required placeholder="AMD Ryzen 7 9800X3D" /></label>
+                <label><span>ราคา (บาท)</span><input name="priceThb" type="number" min="0" step="1" required /></label>
+                <label><span>ลิงก์รูปภาพ</span><input name="imageUrl" type="url" placeholder="https://..." /></label>
+                <label><span>หรืออัปโหลดรูปสินค้า</span><input data-admin-image-file type="file" accept="image/png,image/jpeg,image/webp" /></label>
+                <p class="admin-image-status" data-admin-image-status></p>
+                <div class="admin-image-preview" data-admin-image-preview hidden></div>
+                <input name="productUrl" type="hidden" />
+                <div class="admin-spec-fields" data-admin-spec-fields></div>
+                <label data-admin-specs-json-wrap hidden>
+                  <span>รายละเอียด JSON (หมวดนี้ยังไม่มีฟิลด์เฉพาะ)</span>
+                  <textarea name="specs" rows="6" placeholder="{}"></textarea>
+                </label>
+                <button class="primary-button" type="submit">บันทึกสินค้า</button>
+              </form>
+            </section>
+          </div>
+        </section>
+        <section class="admin-panel" data-admin-dashboard-panel data-view-panel="admin-dashboard" hidden>
+          <div class="admin-header">
+            <div>
+              <h2>แดชบอร์ดแอดมิน</h2>
+              <p>ภาพรวมของระบบและกิจกรรมล่าสุด</p>
+            </div>
+          </div>
+          <div class="admin-dashboard" data-admin-dashboard>
+            <p class="muted">กำลังโหลดข้อมูล...</p>
+          </div>
+        </section>
+        <section class="admin-panel" data-admin-users-panel data-view-panel="admin-users" hidden>
+          <div class="admin-header">
+            <div>
+              <h2>จัดการผู้ใช้</h2>
+              <p data-admin-users-status></p>
+            </div>
+            <form class="admin-search" data-admin-users-search-form>
+              <input name="search" type="search" placeholder="ค้นหาชื่อผู้ใช้" />
+              <button type="submit">ค้นหา</button>
+            </form>
+          </div>
+          <div class="admin-product-list" data-admin-users>
+            <p class="muted">กำลังโหลดผู้ใช้...</p>
+          </div>
+          <nav class="admin-pagination" data-admin-users-pagination aria-label="Admin user pages" hidden></nav>
+        </section>
+        <section class="admin-panel" data-admin-audit-panel data-view-panel="admin-audit" hidden>
+          <div class="admin-header">
+            <div>
+              <h2>กิจกรรมแอดมิน</h2>
+              <p data-admin-audit-status>ตรวจสอบการจัดการสินค้าและผู้ใช้</p>
+            </div>
+            <form class="admin-search" data-admin-audit-search-form>
+              <input name="search" type="search" placeholder="ค้นหาผู้ใช้หรือกิจกรรม" />
+              <button type="submit">ค้นหา</button>
+            </form>
+          </div>
+          <div class="admin-product-list" data-admin-audit>
+            <p class="muted">กำลังโหลดกิจกรรม...</p>
+          </div>
+          <nav class="admin-pagination" data-admin-audit-pagination aria-label="Admin activity pages" hidden></nav>
+        </section>
+        <section class="profile-panel" data-profile-panel data-view-panel="profile" hidden>
+          <div class="profile-header">
+            <h2>บัญชีของฉัน</h2>
+            <p data-profile-username>-</p>
+          </div>
+          <form class="profile-form" data-change-password-form>
+            <h3>เปลี่ยนรหัสผ่าน</h3>
+            <label>
+              <span>รหัสผ่านปัจจุบัน</span>
+              <input name="currentPassword" type="password" autocomplete="current-password" required />
+            </label>
+            <label>
+              <span>รหัสผ่านใหม่</span>
+              <input name="newPassword" type="password" autocomplete="new-password" minlength="6" required />
+            </label>
+            <label>
+              <span>ยืนยันรหัสผ่านใหม่</span>
+              <input name="confirmPassword" type="password" autocomplete="new-password" minlength="6" required />
+            </label>
+            <p class="profile-status" data-change-password-status></p>
+            <button class="primary-button" type="submit">เปลี่ยนรหัสผ่าน</button>
+          </form>
+        </section>
+        <section class="saved-build-list-panel history-panel" data-history-panel data-view-panel="history" hidden>
+          <div class="saved-build-list-header">
+            <div>
+              <h2>ประวัติการจัดสเปค</h2>
+            </div>
+          </div>
+          <p class="hint history-status" data-save-build-status>เลือกสินค้าอย่างน้อย 1 ชิ้น แล้วกดบันทึกสเปคได้ทันที</p>
+          <div class="saved-build-list" data-saved-build-list>
+            <p class="muted">กำลังโหลดสเปคที่บันทึกไว้...</p>
+          </div>
+          <nav class="pagination saved-build-pagination" data-saved-build-pagination aria-label="Saved build pages" hidden></nav>
+          <section class="saved-build-detail" data-saved-build-detail hidden></section>
+        </section>
+        <section class="saved-build-list-panel history-panel" data-public-build data-view-panel="public-build" hidden></section>
+        <section class="saved-build-list-panel history-panel gallery-panel" data-gallery-panel data-view-panel="gallery" hidden>
+          <div class="saved-build-list-header">
+            <div>
+              <h2>สเปคทั้งหมด</h2>
+              <p class="hint">สเปคที่มีคนแชร์และเปิดให้ดูในหน้านี้ ใครก็เข้ามาดูหรือนำไปจัดต่อได้</p>
+            </div>
+          </div>
+          <div class="gallery-grid" data-gallery-list>
+            <p class="muted">กำลังโหลดสเปคทั้งหมด...</p>
+          </div>
+          <nav class="pagination gallery-pagination" data-gallery-pagination aria-label="Gallery pages" hidden></nav>
+        </section>
+        <div class="product-grid" data-products data-view-panel="products"></div>
+        <nav class="pagination" data-pagination data-view-panel="products" aria-label="Product pages" hidden></nav>
+      </section>
+    </main>
+
+    <script type="module" src="./main.js?v=12"></script>
+  </body>
+</html>
