@@ -2,7 +2,17 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { createAuthRoutes } from '../routes/auth.routes.js';
-import { changePassword, createPasswordHash, getCurrentUser, parseCookies, registerUser, verifyPasswordHash } from '../services/auth.service.js';
+import {
+  changePassword,
+  contactEmailSchemaQuery,
+  createPasswordHash,
+  getCurrentUser,
+  isValidEmail,
+  normalizeEmail,
+  parseCookies,
+  registerUser,
+  verifyPasswordHash
+} from '../services/auth.service.js';
 import { createLoginRateLimiter } from '../utils/login-rate-limiter.js';
 
 test('password hashes verify matching passwords only', () => {
@@ -24,6 +34,7 @@ test('registerUser always assigns the user role', async () => {
   let query = '';
   const result = await registerUser({
     username: 'new-admin-attempt',
+    email: 'attempt@example.com',
     password: 'secret123',
     role: 'admin'
   }, {
@@ -33,8 +44,64 @@ test('registerUser always assigns the user role', async () => {
     }
   });
 
-  assert.match(query, /VALUES \('new-admin-attempt', '[^']+', 'user'\)/);
+  assert.match(query, /INSERT INTO users \(username, password_hash, role, contact_email\)\s+VALUES \('new-admin-attempt', '[^']+', 'user', 'attempt@example\.com'\)/);
   assert.equal(result.user.role, 'user');
+});
+
+test('registerUser requires a valid email and never touches the database without one', async () => {
+  let called = false;
+  const options = { runQuery: async () => { called = true; return '{}'; } };
+
+  for (const email of [undefined, '', '   ', 'no-at-sign', 'a@b', 'a b@example.com', 'a@@example.com', `${'x'.repeat(250)}@example.com`]) {
+    await assert.rejects(
+      () => registerUser({ username: 'someone', email, password: 'secret123' }, options),
+      /valid email address is required/,
+      `ควรปฏิเสธอีเมล: ${String(email).slice(0, 20)}`
+    );
+  }
+
+  assert.equal(called, false);
+});
+
+test('registerUser stores the email trimmed and lowercased, and escapes quotes in it', async () => {
+  let query = '';
+  await registerUser({ username: 'sam', email: "  Sam.O'Brien@Example.COM ", password: 'secret123' }, {
+    runQuery: async (sql) => {
+      query = sql;
+      return JSON.stringify({ id: 3, username: 'sam', role: 'user' });
+    }
+  });
+
+  assert.match(query, /'sam\.o\\'brien@example\.com'\);/);
+  assert.equal(normalizeEmail("  Sam@Example.COM "), 'sam@example.com');
+  assert.equal(isValidEmail('sam@example.com'), true);
+  assert.equal(isValidEmail('sam@example'), false);
+});
+
+test('registerUser turns MySQL duplicate-key errors into short messages the page can match', async () => {
+  const failWith = (message) => ({ runQuery: async () => { throw new Error(message); } });
+  const input = { username: 'sam', email: 'sam@example.com', password: 'secret123' };
+
+  await assert.rejects(
+    () => registerUser(input, failWith("ERROR 1062 (23000) at line 5: Duplicate entry 'sam@example.com' for key 'users.contact_email'")),
+    (error) => error.message === 'This email is already registered'
+  );
+  await assert.rejects(
+    () => registerUser(input, failWith("ERROR 1062 (23000) at line 5: Duplicate entry 'sam' for key 'users.username'")),
+    (error) => error.message === 'This username is already taken'
+  );
+  await assert.rejects(
+    () => registerUser(input, failWith('ERROR 2002: cannot connect')),
+    /cannot connect/
+  );
+});
+
+test('contact_email migration adds a nullable UNIQUE column only when missing', () => {
+  const sql = contactEmailSchemaQuery();
+
+  assert.match(sql, /ADD COLUMN contact_email VARCHAR\(255\) NULL UNIQUE/);
+  assert.match(sql, /COLUMN_NAME = 'contact_email'/);
+  assert.match(sql, /SET @noop = 1/);
 });
 
 test('changePassword verifies the old password and clears every user session', async () => {

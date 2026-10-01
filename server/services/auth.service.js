@@ -32,6 +32,7 @@ export async function registerUser(payload = {}, options = {}) {
   const config = options.config || getDatabaseConfig();
   const runQuery = options.runQuery || ((query) => runMysqlScalar(config, query));
   const username = normalizeUsername(payload.username);
+  const email = normalizeEmail(payload.email);
   const password = String(payload.password || '');
   const role = 'user';
 
@@ -39,11 +40,39 @@ export async function registerUser(payload = {}, options = {}) {
     throw new Error('Username and password with at least 6 characters are required');
   }
 
+  // อีเมลใช้สำหรับกู้คืนรหัสผ่านเมื่อลืม (บังคับกรอกตอนสมัคร)
+  if (!isValidEmail(email)) {
+    throw new Error('A valid email address is required');
+  }
+
   const token = createSessionToken();
   const passwordHash = createPasswordHash(password);
-  const result = await runQuery(buildRegisterQuery({ username, passwordHash, role, token }));
+  let result;
+
+  try {
+    result = await runQuery(buildRegisterQuery({ username, email, passwordHash, role, token }));
+  } catch (error) {
+    throw translateRegisterError(error);
+  }
 
   return parseAuthResult(result, token, { username, role });
+}
+
+// MySQL error 1062 ข้อความดิบอ่านยาก (และเผยชื่อคีย์ภายใน) - แปลงเป็นข้อความสั้นที่หน้าเว็บจับคู่ได้
+function translateRegisterError(error) {
+  const message = String(error?.message || '');
+
+  if (/duplicate entry/i.test(message)) {
+    if (/contact_email/i.test(message)) {
+      return new Error('This email is already registered');
+    }
+
+    if (/username/i.test(message)) {
+      return new Error('This username is already taken');
+    }
+  }
+
+  return error;
 }
 
 export async function loginUser(payload = {}, options = {}) {
@@ -147,13 +176,13 @@ export function parseCookies(header = '') {
   }, {});
 }
 
-function buildRegisterQuery({ username, passwordHash, role, token }) {
+function buildRegisterQuery({ username, email, passwordHash, role, token }) {
   return `
     DELETE FROM user_sessions
     WHERE created_at <= DATE_SUB(UTC_TIMESTAMP(), INTERVAL ${sessionMaxAgeSeconds} SECOND);
 
-    INSERT INTO users (username, password_hash, role)
-    VALUES ('${escapeSqlString(username)}', '${escapeSqlString(passwordHash)}', '${escapeSqlString(role)}');
+    INSERT INTO users (username, password_hash, role, contact_email)
+    VALUES ('${escapeSqlString(username)}', '${escapeSqlString(passwordHash)}', '${escapeSqlString(role)}', '${escapeSqlString(email)}');
 
     SET @user_id = LAST_INSERT_ID();
 
@@ -264,6 +293,37 @@ export function sanitizeUser(user) {
 
 export function createSessionToken() {
   return randomBytes(32).toString('hex');
+}
+
+export function normalizeEmail(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+// ตรวจแบบพอประมาณ: มี @ และโดเมนที่มีจุด ไม่มีช่องว่าง ยาวไม่เกิน 254 ตัวอักษร
+// (ไม่พยายามตรวจตามมาตรฐาน RFC ทั้งหมด - การยืนยันว่าเป็นอีเมลจริงคือการส่งลิงก์ไปหา ซึ่งยังไม่มีในระบบตอนนี้)
+export function isValidEmail(email) {
+  return typeof email === 'string' && email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+// คอลัมน์แยกจาก users.email ที่ Google/Facebook login ใช้ "ผูกบัญชีตามอีเมลที่ยืนยันแล้ว" (oauth.service.js)
+// เหตุผล: อีเมลที่กรอกตอนสมัครเองยังไม่ได้ยืนยัน ถ้าใช้คอลัมน์เดียวกัน คนอื่นสมัครล่วงหน้าด้วยอีเมลของเหยื่อได้
+// แล้วเมื่อเหยื่อล็อกอิน Google ครั้งแรก บัญชี Google จะถูกผูกเข้ากับบัญชีที่คนร้ายรู้รหัสผ่าน
+// (UNIQUE: MySQL อนุญาตค่า NULL ซ้ำได้ บัญชีเก่าที่ยังไม่มีอีเมลจึงไม่กระทบ)
+export function contactEmailSchemaQuery() {
+  return `
+    SET @add_contact_email_column = (
+      SELECT IF(
+        COUNT(*) = 0,
+        'ALTER TABLE users ADD COLUMN contact_email VARCHAR(255) NULL UNIQUE AFTER username',
+        'SET @noop = 1'
+      )
+      FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'contact_email'
+    );
+    PREPARE add_contact_email_statement FROM @add_contact_email_column;
+    EXECUTE add_contact_email_statement;
+    DEALLOCATE PREPARE add_contact_email_statement;
+  `;
 }
 
 export function normalizeUsername(value) {

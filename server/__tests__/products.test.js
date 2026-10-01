@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { createProductRoutes } from '../routes/products.routes.js';
-import { buildFilterWhere, escapeSqlString, normalizeLimit, normalizeOffset, toThaiBahtExpression } from '../services/products.service.js';
+import { buildFilterWhere, buildWhereClause, escapeSqlString, normalizeAvailability, normalizeLimit, normalizeOffset, toThaiBahtExpression } from '../services/products.service.js';
 
 test('normalizeLimit keeps product list requests bounded', () => {
   assert.equal(normalizeLimit('12'), 12);
@@ -209,3 +209,83 @@ function createMockResponse() {
     }
   };
 }
+
+test('normalizeAvailability is a whitelist: only th / not-th / unknown pass, anything else means "no filter"', () => {
+  assert.equal(normalizeAvailability('th'), 'th');
+  assert.equal(normalizeAvailability(' not-th '), 'not-th');
+  assert.equal(normalizeAvailability('unknown'), 'unknown');
+  assert.equal(normalizeAvailability(''), '');
+  assert.equal(normalizeAvailability(undefined), '');
+  assert.equal(normalizeAvailability("th' OR 1=1 --"), '');
+  assert.equal(normalizeAvailability('TH'), '');
+});
+
+test('buildWhereClause turns the availability filter into a thailand_check status condition', () => {
+  const th = buildWhereClause({ category: 'monitor', availability: 'th' });
+  assert.match(th, /category = 'monitor'/);
+  assert.match(th, /\$\.thailand_check\.status.*IN \('found', 'found_active'\)/s);
+
+  const notTh = buildWhereClause({ category: 'monitor', availability: 'not-th' });
+  assert.match(notTh, /IN \('not_found', 'found_inactive'\)/);
+
+  // "unknown" รวมสินค้าที่ยังไม่เคยตรวจ (status เป็น NULL) และสถานะที่ไม่ตัดสิน (ambiguous)
+  const unknown = buildWhereClause({ category: 'monitor', availability: 'unknown' });
+  assert.match(unknown, /NOT \(.*IN \('found', 'found_active'\).*\) AND NOT \(.*IN \('not_found', 'found_inactive'\)/s);
+  // สถานะ NULL (ยังไม่เคยตรวจ) ต้องถูกแปลงเป็นค่าว่างก่อนเทียบ ไม่งั้น NOT (NULL IN ...) จะทำให้แถวเหล่านั้นหายไป
+  assert.match(unknown, /COALESCE\(JSON_UNQUOTE\(JSON_EXTRACT\(specs, '\$\.thailand_check\.status'\)\), ''\)/);
+
+  // ไม่ระบุ หรือค่าแปลก = ไม่มีเงื่อนไขนี้ (และไม่มี SQL ที่ผู้ใช้พิมพ์เองหลุดเข้าไป)
+  assert.doesNotMatch(buildWhereClause({ category: 'monitor' }), /thailand_check/);
+  assert.doesNotMatch(buildWhereClause({ category: 'monitor', availability: "x' OR 1=1 --" }), /thailand_check|OR 1=1/);
+});
+
+test('GET /api/products forwards a valid availability filter and drops an invalid one', async () => {
+  const seen = [];
+  const route = createProductRoutes({
+    listProducts: async (requestFilters) => {
+      seen.push(requestFilters);
+      return { products: [], total: 0, limit: 24, offset: 0 };
+    }
+  });
+
+  await route({ method: 'GET', url: '/api/products?category=monitor&availability=not-th' }, createMockResponse());
+  await route({ method: 'GET', url: "/api/products?category=monitor&availability=th'%20OR%201%3D1" }, createMockResponse());
+  await route({ method: 'GET', url: '/api/products?category=monitor' }, createMockResponse());
+
+  assert.equal(seen[0].availability, 'not-th');
+  assert.equal('availability' in seen[1], false);
+  assert.equal('availability' in seen[2], false);
+});
+
+test('availability filter counts a shop listed in thailand_check.also_sold_at (e.g. JIB) as sold in Thailand', () => {
+  const th = buildWhereClause({ category: 'monitor', availability: 'th' });
+  // พบที่ Banana หรือมีร้านอื่นใน also_sold_at ก็นับ
+  assert.match(th, /IN \('found', 'found_active'\) OR COALESCE\(JSON_LENGTH\(JSON_EXTRACT\(specs, '\$\.thailand_check\.also_sold_at'\)\), 0\) > 0/);
+
+  // "ไม่พบใน Banana" ต้องไม่รวมสินค้าที่พบที่ร้านอื่น
+  const notTh = buildWhereClause({ category: 'monitor', availability: 'not-th' });
+  assert.match(notTh, /IN \('not_found', 'found_inactive'\) AND NOT COALESCE\(JSON_LENGTH/);
+
+  // unknown = ไม่ใช่ทั้ง "มีขาย" และ "ไม่พบ"
+  const unknown = buildWhereClause({ category: 'monitor', availability: 'unknown' });
+  assert.match(unknown, /NOT \(.*also_sold_at.*\) AND NOT \(/s);
+});
+
+test('GET /api/products forwards valid monitor spec filters and drops invalid ones', async () => {
+  const seen = [];
+  const route = createProductRoutes({
+    listProducts: async (requestFilters) => {
+      seen.push(requestFilters);
+      return { products: [], total: 0, limit: 24, offset: 0 };
+    }
+  });
+
+  await route({ method: 'GET', url: '/api/products?category=monitor&minRefreshRate=144&screenSize=m&resolution=qhd&panelType=IPS' }, createMockResponse());
+  await route({ method: 'GET', url: "/api/products?category=monitor&minRefreshRate=999&screenSize=zz&panelType=x'%20OR%201%3D1" }, createMockResponse());
+
+  assert.equal(seen[0].minRefreshRate, 144);
+  assert.equal(seen[0].screenSize, 'm');
+  assert.equal(seen[0].resolution, 'qhd');
+  assert.equal(seen[0].panelType, 'IPS');
+  for (const key of ['minRefreshRate', 'screenSize', 'resolution', 'panelType']) assert.equal(key in seen[1], false, key);
+});

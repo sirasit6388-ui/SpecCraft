@@ -1,4 +1,5 @@
 import { getDatabaseConfig } from '../config/database.js';
+import { buildMonitorFilterOptions, HEIGHT_EXPRESSION, HZ_EXPRESSION, monitorFilterClauses, PANEL_EXPRESSION, SIZE_EXPRESSION } from './monitor-filters.js';
 import { runMysqlScalar } from './database.service.js';
 
 // สินค้าที่แอดมิน "ซ่อน" ไว้ (is_hidden = 1) หลังจากรีวิว removal-review-report.xlsx แล้ว
@@ -63,7 +64,18 @@ export async function listProductFilters(filters = {}, config = getDatabaseConfi
     );
   `);
  
-  return JSON.parse(result || '{"brands":[],"sockets":[],"series":[]}');
+  const parsed = JSON.parse(result || '{"brands":[],"sockets":[],"series":[]}');
+
+  // หมวดจอ: ตัวเลือกของตัวกรองสเปค (นับจากจอที่แสดงอยู่ในร้านทั้งหมวด ไม่ขึ้นกับแบรนด์ที่เลือก)
+  if (filters.category === 'monitor') {
+    const rows = JSON.parse(await runMysqlScalar(config, `
+      SELECT COALESCE(JSON_ARRAYAGG(JSON_ARRAY(${HZ_EXPRESSION}, ${SIZE_EXPRESSION}, ${HEIGHT_EXPRESSION}, ${PANEL_EXPRESSION})), JSON_ARRAY())
+      FROM products
+      WHERE category = 'monitor' AND price IS NOT NULL AND ${NOT_HIDDEN_CLAUSE};`) || '[]');
+    parsed.monitor = buildMonitorFilterOptions(rows);
+  }
+
+  return parsed;
 }
  
 export async function listProducts(filters = {}, config = getDatabaseConfig()) {
@@ -94,6 +106,61 @@ export async function listProducts(filters = {}, config = getDatabaseConfig()) {
           'coolerHeight', cooler_height,
           'radiatorSize', radiator_size,
           'maxCpuCoolerHeight', max_cpu_cooler_height,
+          'coreCount', core_count,
+          'coreClockGhz', core_clock_ghz,
+          'boostClockGhz', boost_clock_ghz,
+          'microarchitecture', microarchitecture,
+          'graphics', graphics,
+          'threads', threads,
+          'l1Cache', l1_cache,
+          'l2Cache', l2_cache,
+          'l3Cache', l3_cache,
+          'cacheText', cache_text,
+          'thermalSolution', thermal_solution,
+          'color', color,
+          'chipset', gpu_chipset,
+          'vramGb', gpu_vram_gb,
+          'gpuCoreClockMhz', gpu_core_clock_mhz,
+          'gpuBoostClockMhz', gpu_boost_clock_mhz,
+          'maxMemoryGb', max_memory_gb,
+          'memorySlots', memory_slots,
+          'memorySpeedMhz', memory_speed_mhz,
+          'memoryModuleCount', memory_module_count,
+          'memoryModuleGb', memory_module_gb,
+          'casLatency', cas_latency,
+          'firstWordLatencyNs', first_word_latency_ns,
+          'efficiency', psu_efficiency,
+          'modular', psu_modular,
+          'sidePanel', side_panel,
+          'internal35Bays', internal_35_bays,
+          'includedPsuWatt', included_psu_watt,
+          'rpm', cooler_rpm,
+          'noiseLevelDb', cooler_noise_db,
+          'storageCapacityGb', storage_capacity_gb,
+          'storageInterface', storage_interface,
+          'storageCacheMb', storage_cache_mb,
+          'cpuSeries', cpu_series,
+          'cpuProcess', cpu_process,
+          'cpu64bit', cpu_64bit_support,
+          'cpuVirtualization', cpu_virtualization_support,
+          'screenSizeInch', monitor_screen_size,
+          'resolution', monitor_resolution,
+          'refreshRate', monitor_refresh_rate,
+          'responseTimeMs', monitor_response_time,
+          'panelType', monitor_panel_type,
+          'aspectRatio', monitor_aspect_ratio,
+          'thailandStatus', thailand_status,
+          'thailandBanana', thailand_banana,
+          'thailandAlsoAt', thailand_also_at,
+          'listPrice', CASE
+            WHEN check_srp_price IS NOT NULL AND check_selling_price IS NOT NULL
+              AND check_srp_price > check_selling_price
+              AND ABS(price_thb - check_selling_price) < 0.5
+            THEN check_srp_price
+            ELSE NULL
+          END,
+          'bananaSpecs', banana_specs,
+          'bananaSpecsUrl', banana_specs_url,
           'currency', 'THB',
           'imageUrl', image_url,
           'productUrl', product_url
@@ -125,6 +192,60 @@ export async function listProducts(filters = {}, config = getDatabaseConfig()) {
             JSON_EXTRACT(specs, '$.height') AS cooler_height,
             JSON_EXTRACT(specs, '$.size') AS radiator_size,
             JSON_EXTRACT(specs, '$.max_cpu_cooler_height') AS max_cpu_cooler_height,
+            JSON_EXTRACT(specs, '$.core_count') AS core_count,
+            JSON_EXTRACT(specs, '$.core_clock_ghz') AS core_clock_ghz,
+            JSON_EXTRACT(specs, '$.boost_clock_ghz') AS boost_clock_ghz,
+            JSON_UNQUOTE(JSON_EXTRACT(specs, '$.microarchitecture')) AS microarchitecture,
+            JSON_UNQUOTE(JSON_EXTRACT(specs, '$.graphics')) AS graphics,
+            JSON_EXTRACT(specs, '$.threads') AS threads,
+            JSON_UNQUOTE(JSON_EXTRACT(specs, '$.l1_cache')) AS l1_cache,
+            JSON_UNQUOTE(JSON_EXTRACT(specs, '$.l2_cache')) AS l2_cache,
+            JSON_UNQUOTE(JSON_EXTRACT(specs, '$.l3_cache')) AS l3_cache,
+            JSON_UNQUOTE(JSON_EXTRACT(specs, '$.cache_text')) AS cache_text,
+            JSON_UNQUOTE(JSON_EXTRACT(specs, '$.thermal_solution')) AS thermal_solution,
+            ${specText('color')} AS color,
+            CASE WHEN category = 'video-card' THEN ${specText('chipset')} ELSE NULL END AS gpu_chipset,
+            CASE WHEN category = 'video-card' THEN JSON_EXTRACT(specs, '$.memory') ELSE NULL END AS gpu_vram_gb,
+            CASE WHEN category = 'video-card' THEN JSON_EXTRACT(specs, '$.core_clock') ELSE NULL END AS gpu_core_clock_mhz,
+            CASE WHEN category = 'video-card' THEN JSON_EXTRACT(specs, '$.boost_clock') ELSE NULL END AS gpu_boost_clock_mhz,
+            CASE WHEN category = 'motherboard' THEN JSON_EXTRACT(specs, '$.max_memory') ELSE NULL END AS max_memory_gb,
+            CASE WHEN category = 'motherboard' THEN JSON_EXTRACT(specs, '$.memory_slots') ELSE NULL END AS memory_slots,
+            CASE WHEN category = 'memory' THEN JSON_EXTRACT(specs, '$.speed[1]') ELSE NULL END AS memory_speed_mhz,
+            CASE WHEN category = 'memory' THEN JSON_EXTRACT(specs, '$.modules[0]') ELSE NULL END AS memory_module_count,
+            CASE WHEN category = 'memory' THEN JSON_EXTRACT(specs, '$.modules[1]') ELSE NULL END AS memory_module_gb,
+            CASE WHEN category = 'memory' THEN JSON_EXTRACT(specs, '$.cas_latency') ELSE NULL END AS cas_latency,
+            CASE WHEN category = 'memory' THEN JSON_EXTRACT(specs, '$.first_word_latency') ELSE NULL END AS first_word_latency_ns,
+            CASE WHEN category = 'power-supply' THEN ${specText('efficiency')} ELSE NULL END AS psu_efficiency,
+            CASE WHEN category = 'power-supply' THEN JSON_EXTRACT(specs, '$.modular') ELSE NULL END AS psu_modular,
+            CASE WHEN category = 'case' THEN ${specText('side_panel')} ELSE NULL END AS side_panel,
+            CASE WHEN category = 'case' THEN JSON_EXTRACT(specs, '$.internal_35_bays') ELSE NULL END AS internal_35_bays,
+            CASE WHEN category = 'case' THEN JSON_EXTRACT(specs, '$.psu') ELSE NULL END AS included_psu_watt,
+            CASE WHEN category = 'cpu-cooler' THEN JSON_EXTRACT(specs, '$.rpm') ELSE NULL END AS cooler_rpm,
+            CASE WHEN category = 'cpu-cooler' THEN JSON_EXTRACT(specs, '$.noise_level') ELSE NULL END AS cooler_noise_db,
+            CASE WHEN category = 'internal-hard-drive' THEN JSON_EXTRACT(specs, '$.capacity') ELSE NULL END AS storage_capacity_gb,
+            CASE WHEN category = 'internal-hard-drive' THEN ${specText('interface')} ELSE NULL END AS storage_interface,
+            CASE WHEN category = 'internal-hard-drive' THEN JSON_EXTRACT(specs, '$.cache') ELSE NULL END AS storage_cache_mb,
+            CASE WHEN category = 'cpu' THEN ${specText('cpu_series')} ELSE NULL END AS cpu_series,
+            CASE WHEN category = 'cpu' THEN ${specText('cpu_process')} ELSE NULL END AS cpu_process,
+            CASE WHEN category = 'cpu' THEN ${specText('cpu_64bit_support')} ELSE NULL END AS cpu_64bit_support,
+            CASE WHEN category = 'cpu' THEN ${specText('cpu_virtualization_support')} ELSE NULL END AS cpu_virtualization_support,
+            CASE WHEN category = 'monitor' THEN JSON_EXTRACT(specs, '$.screen_size') ELSE NULL END AS monitor_screen_size,
+            CASE WHEN category = 'monitor' THEN JSON_EXTRACT(specs, '$.resolution') ELSE NULL END AS monitor_resolution,
+            CASE WHEN category = 'monitor' THEN JSON_EXTRACT(specs, '$.refresh_rate') ELSE NULL END AS monitor_refresh_rate,
+            CASE WHEN category = 'monitor' THEN JSON_EXTRACT(specs, '$.response_time') ELSE NULL END AS monitor_response_time,
+            CASE WHEN category = 'monitor' THEN ${specText('panel_type')} ELSE NULL END AS monitor_panel_type,
+            CASE WHEN category = 'monitor' THEN ${specText('aspect_ratio')} ELSE NULL END AS monitor_aspect_ratio,
+            CASE
+              WHEN ${THAILAND_SOLD_SQL} THEN 'th'
+              WHEN ${THAILAND_NOT_SOLD_SQL} THEN 'not-th'
+              ELSE NULL
+            END AS thailand_status,
+            (${THAILAND_STATUS_SAFE} IN ${THAILAND_SOLD_STATUSES}) AS thailand_banana,
+            JSON_EXTRACT(specs, '$.thailand_check.also_sold_at') AS thailand_also_at,
+            CAST(JSON_EXTRACT(specs, '$.thailand_check.selling_price') AS DECIMAL(12,2)) AS check_selling_price,
+            CAST(JSON_EXTRACT(specs, '$.thailand_check.srp_price') AS DECIMAL(12,2)) AS check_srp_price,
+            JSON_EXTRACT(specs, '$.banana_specs') AS banana_specs,
+            JSON_UNQUOTE(JSON_EXTRACT(specs, '$.banana_specs_url')) AS banana_specs_url,
             image_url,
             product_url,
             source
@@ -183,7 +304,49 @@ export function toThaiBahtExpression(columnName, currencyColumn = 'price_currenc
   END`;
 }
  
-function buildWhereClause(filters) {
+// สถานะการมีขายในไทยจาก specs.thailand_check.status (เขียนโดย flag-thailand-availability.js / flag-monitor-thailand.js /
+// update-from-banana-equip.js ซึ่งใช้คำต่างกันเล็กน้อย: found / found_active = มีขาย, not_found / found_inactive = ไม่มีขาย)
+// ข้อความจาก specs: ถ้าค่าใน JSON เป็น null (เช่น ข้อมูลต้นทางมีคีย์แต่ไม่มีค่า) JSON_UNQUOTE(JSON_EXTRACT(..)) จะคืน
+// "ข้อความ null" 4 ตัวอักษร ไม่ใช่ SQL NULL ทำให้หน้าเว็บโชว์คำว่า null (ทดสอบกับ MySQL 8 จริงแล้ว) จึงแปลงกลับเป็น NULL
+function specText(key) {
+  return `NULLIF(JSON_UNQUOTE(JSON_EXTRACT(specs, '$.${key}')), 'null')`;
+}
+
+const THAILAND_STATUS_EXPRESSION = "JSON_UNQUOTE(JSON_EXTRACT(specs, '$.thailand_check.status'))";
+// สินค้าที่ยังไม่เคยตรวจไม่มี status (NULL) และใน SQL "NULL IN (...)" ให้ NULL ไม่ใช่ FALSE - พอเอาไป NOT ต่อ
+// (ตัวกรอง "ยังไม่แน่ชัด") แถวเหล่านั้นจะหลุดหายไปเงียบๆ (ทดสอบกับ MySQL 8 จริงแล้วเจอบั๊กนี้) จึงแปลง NULL เป็นข้อความว่างก่อนเทียบ
+const THAILAND_STATUS_SAFE = `COALESCE(${THAILAND_STATUS_EXPRESSION}, '')`;
+const THAILAND_SOLD_STATUSES = "('found', 'found_active')";
+const THAILAND_NOT_SOLD_STATUSES = "('not_found', 'found_inactive')";
+const AVAILABILITY_VALUES = new Set(['th', 'not-th', 'unknown']);
+
+// whitelist: ค่าอื่นทั้งหมดถือว่าไม่กรอง (ค่านี้ถูกใส่ใน SQL จึงห้ามรับค่าอิสระ)
+export function normalizeAvailability(value) {
+  const text = String(value ?? '').trim();
+  return AVAILABILITY_VALUES.has(text) ? text : '';
+}
+
+// ร้านอื่นที่พบสินค้านี้ (เช่น JIB) - เขียนโดย check-monitor-jib.js เป็น [{ shop, url, checked_at }]
+// พบที่ร้านใดร้านหนึ่งถือว่ามีขายในไทย แม้ Banana จะไม่พบ
+const THAILAND_ALSO_SOLD_EXPRESSION = "COALESCE(JSON_LENGTH(JSON_EXTRACT(specs, '$.thailand_check.also_sold_at')), 0) > 0";
+const THAILAND_SOLD_SQL = `(${THAILAND_STATUS_SAFE} IN ${THAILAND_SOLD_STATUSES} OR ${THAILAND_ALSO_SOLD_EXPRESSION})`;
+const THAILAND_NOT_SOLD_SQL = `(${THAILAND_STATUS_SAFE} IN ${THAILAND_NOT_SOLD_STATUSES} AND NOT ${THAILAND_ALSO_SOLD_EXPRESSION})`;
+
+function buildAvailabilityClause(availability) {
+  switch (normalizeAvailability(availability)) {
+    case 'th':
+      return THAILAND_SOLD_SQL;
+    case 'not-th':
+      return THAILAND_NOT_SOLD_SQL;
+    case 'unknown':
+      // ที่เหลือทั้งหมด: ยังไม่ตรวจ (status เป็น NULL) หรือไม่ตัดสิน (ambiguous) และไม่ได้พบที่ร้านไหน
+      return `(NOT ${THAILAND_SOLD_SQL} AND NOT ${THAILAND_NOT_SOLD_SQL})`;
+    default:
+      return '';
+  }
+}
+
+export function buildWhereClause(filters) {
   // สินค้าที่ยังไม่มีราคา (price IS NULL) จะไม่โผล่ในหน้าร้าน/ระบบจัดสเปกอัตโนมัติ
   // เพราะไม่สามารถคำนวณงบหรือแสดงราคาให้ผู้ใช้ได้ แต่ข้อมูลยังเก็บไว้ในฐานข้อมูลตามเดิม
   // (ยังดูและแก้ไขได้ผ่านหน้าแอดมิน เผื่อเติมราคาย้อนหลังในอนาคต)
@@ -209,6 +372,17 @@ function buildWhereClause(filters) {
   if (filters.search) {
     const search = `%${escapeSqlString(filters.search)}%`;
     clauses.push(`(name LIKE '${search}' OR brand LIKE '${search}')`);
+  }
+ 
+  const availabilityClause = buildAvailabilityClause(filters.availability);
+
+  if (availabilityClause) {
+    clauses.push(availabilityClause);
+  }
+
+  // ตัวกรองสเปคจอ (Hz / ขนาด / ความละเอียด / ชนิดแผง) ใช้เฉพาะหมวด monitor
+  if (filters.category === 'monitor') {
+    clauses.push(...monitorFilterClauses(filters));
   }
  
   return clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';

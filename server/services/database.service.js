@@ -27,23 +27,32 @@ export async function runMysqlScalar(config, query) {
   }
 }
 
-function runMysqlWithCredentials(config, query, credentialsPath) {
+// ส่ง SQL ผ่าน stdin ไม่ใช่ argument บรรทัดคำสั่ง (--execute): Windows จำกัดความยาวบรรทัดคำสั่งราว 32,000 ตัวอักษร
+// คำสั่ง INSERT ที่มี JSON ยาวๆ (เช่นตารางสเปคหลายรุ่นในคำสั่งเดียว) จึงพังด้วย "spawn ENAMETOOLONG" ทั้งที่ใช้ได้บน Linux/Mac
+// spawnImpl เปิดไว้ให้เทสต์ใส่ตัวปลอมได้
+export function runMysqlWithCredentials(config, query, credentialsPath, { spawnImpl = spawn } = {}) {
   return new Promise((resolve, reject) => {
     const args = [
       `--defaults-extra-file=${credentialsPath}`,
       `--host=${config.host}`,
       `--port=${config.port}`,
       `--user=${config.user}`,
+      // ระบุ charset ของไคลเอนต์ชัดเจน: ถ้าไม่ระบุ mysql เลือกจากภาษาของระบบปฏิบัติการ (บนเครื่องที่เป็น latin1
+      // ข้อความไทย/อีโมจิ/สัญลักษณ์ เช่น ° ™ µ ที่ส่งไปกับ SQL จะถูกแปลงผิดและเก็บเป็นตัวอักษรเพี้ยนใน JSON)
+      '--default-character-set=utf8mb4',
       '--batch',
       '--raw',
       '--skip-column-names',
-      config.database,
-      '--execute',
-      query
+      config.database
     ];
-    const mysql = spawn(config.mysqlBin, args, { windowsHide: true });
+    const mysql = spawnImpl(config.mysqlBin, args, { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
     let stdout = '';
     let stderr = '';
+
+    // ถ้า mysql ปิดตัวก่อนอ่านคำสั่งครบ (เช่นต่อฐานข้อมูลไม่ได้) การเขียน stdin จะเกิด EPIPE ซึ่งไม่ใช่สาเหตุจริง
+    // สาเหตุจริงอยู่ใน stderr ที่ handler 'close' ด้านล่างจะรายงานเอง จึงกลืน error ของ stdin ไว้
+    mysql.stdin.on('error', () => {});
+    mysql.stdin.end(String(query), 'utf8');
 
     mysql.stdout.on('data', (chunk) => {
       stdout += chunk;

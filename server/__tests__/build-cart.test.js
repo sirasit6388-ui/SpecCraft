@@ -113,3 +113,38 @@ test('mergeDuplicateCartItems leaves an already-merged (quantity-tagged) cart un
   assert.equal(merged.length, 2);
   assert.equal(getCartItemByCategory(merged, 'memory').quantity, 2);
 });
+
+test('monitor cart items keep the fields needed for the summary line, other categories are unchanged', () => {
+  const monitor = {
+    id: 9001,
+    category: 'monitor',
+    name: 'MSI PRO MP165 E6',
+    price: 3400,
+    screenSizeInch: 15.6,
+    panelType: 'IPS',
+    resolution: [1920, 1080],
+    refreshRate: 60,
+    responseTimeMs: 4
+  };
+  const [item] = addCartItem([], monitor);
+
+  assert.equal(item.screenSizeInch, 15.6);
+  assert.equal(item.panelType, 'IPS');
+  assert.deepEqual(item.resolution, [1920, 1080]);
+  assert.equal(item.refreshRate, 60);
+  assert.equal('responseTimeMs' in item, false);
+
+  // หมวดอื่นต้องไม่มีฟิลด์ของจอโผล่มาในรูปแบบเดิม
+  const [cpuItem] = addCartItem([], { id: 1, category: 'cpu', name: 'Ryzen 5', price: 5000, panelType: 'IPS' });
+  assert.equal('panelType' in cpuItem, false);
+  assert.equal('screenSizeInch' in cpuItem, false);
+
+  // ผลรวมราคารวมจอ และล้างจอออกได้เหมือนหมวดอื่น
+  const withCpu = addCartItem([cpuItem], monitor);
+  assert.equal(calculateCartTotal(withCpu), 8400);
+  assert.equal(removeCartItem(withCpu, 'monitor').length, 1);
+
+  // โหลดกลับจาก localStorage แล้วต้องยังมีฟิลด์ของจอ
+  const hydrated = hydrateCartItems(JSON.stringify(withCpu));
+  assert.deepEqual(getCartItemByCategory(hydrated, 'monitor').resolution, [1920, 1080]);
+});

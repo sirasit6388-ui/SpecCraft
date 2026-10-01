@@ -1,5 +1,6 @@
 import { filterCompatibleProducts } from '../services/builder.service.js';
-import { listCategories, listProductFilters, listProducts, normalizeLimit, normalizeOffset } from '../services/products.service.js';
+import { normalizeMonitorFilters } from '../services/monitor-filters.js';
+import { listCategories, listProductFilters, listProducts, normalizeAvailability, normalizeLimit, normalizeOffset } from '../services/products.service.js';
 import { sendJson } from '../utils/api-response.js';
 
 const SELECTED_PRODUCT_KEYS = ['cpu', 'motherboard', 'videoCard', 'case', 'cpuCooler'];
@@ -80,6 +81,16 @@ export function createProductRoutes(options = {}) {
           socket: requestUrl.searchParams.get('socket') || '',
           search: requestUrl.searchParams.get('search') || ''
         };
+        // ใส่เฉพาะเมื่อเป็นค่าที่อนุญาต (th / not-th / unknown) - ไม่ใส่คีย์ว่างเพื่อให้รูปแบบตัวกรองเดิมไม่เปลี่ยน
+        const availability = normalizeAvailability(requestUrl.searchParams.get('availability'));
+
+        if (availability) {
+          baseFilters.availability = availability;
+        }
+
+        // ตัวกรองสเปคจอ: รับเฉพาะค่าที่อยู่ในรายการอนุญาต (ค่าแปลกถูกทิ้ง) และมีผลเฉพาะหมวด monitor
+        Object.assign(baseFilters, normalizeMonitorFilters(requestUrl.searchParams));
+
         // Only meaningful (and only parsed) when browsing a single category -
         // that's the manual builder's "pick a part" view, the only place a
         // cross-category compatibility filter makes sense.
