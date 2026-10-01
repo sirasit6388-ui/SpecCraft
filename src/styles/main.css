@@ -294,7 +294,8 @@ select:focus-visible {
 
 .product-detail-media {
   align-items: center;
-  background: #f7f7f8;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
   border-radius: 12px;
   display: flex;
   justify-content: center;
@@ -3547,4 +3548,34 @@ body {
 .filters.filters-monitor select {
   min-width: 0;
   width: 100%;
+}
+
+/* ---- หน้าต่างรายละเอียดสินค้า: ปุ่ม "เพิ่มเข้าสเปค" ตรงที่ว่างใต้ราคา (หน้าตาเดียวกับปุ่มบนการ์ดสินค้า) ---- */
+.product-detail-actions {
+  margin-top: 4px;
+  max-width: 300px;
+}
+
+.product-detail-actions button {
+  background: #ffffff;
+  border: 1px solid var(--maroon);
+  border-radius: 14px;
+  color: var(--maroon);
+  cursor: pointer;
+  font-weight: 900;
+  min-height: 44px;
+}
+
+.product-detail-actions button:hover {
+  background: var(--maroon);
+  border-color: var(--maroon);
+  color: #ffffff;
+}
+
+.product-detail-actions button.product-add-button-added,
+.product-detail-actions button.product-add-button-added:hover {
+  background: var(--maroon-soft);
+  border-color: var(--maroon-soft);
+  color: var(--maroon);
+  cursor: default;
 }

@@ -168,6 +168,7 @@ const productDetailMediaEl = document.querySelector('[data-product-detail-media]
 const productDetailTagsEl = document.querySelector('[data-product-detail-tags]');
 const productDetailNameEl = document.querySelector('[data-product-detail-name]');
 const productDetailPriceEl = document.querySelector('[data-product-detail-price]');
+const productDetailActionsEl = document.querySelector('[data-product-detail-actions]');
 const productDetailSpecsEl = document.querySelector('[data-product-detail-specs]');
 const productDetailNoteEl = document.querySelector('[data-product-detail-note]');
 
@@ -359,6 +360,7 @@ confirmModalEl?.addEventListener('click', (event) => {
   }
 });
 productDetailCloseButton?.addEventListener('click', closeProductDetailModal);
+productDetailActionsEl?.addEventListener('click', handleProductDetailAdd);
 productDetailModalEl?.addEventListener('click', (event) => {
   if (event.target === productDetailModalEl) {
     closeProductDetailModal();
@@ -2617,6 +2619,23 @@ const productAddCheckIcon = `
   </svg>
 `;
 
+// ปุ่ม "เพิ่มเข้าสเปค" ใช้ร่วมกันระหว่างการ์ดสินค้า (attribute = data-add-product) และหน้าต่างรายละเอียดสินค้า
+// (attribute = data-detail-add) - ถ้าสินค้านี้ถูกเลือกไว้ในหมวดนั้นอยู่แล้ว แสดงสถานะ "เพิ่มเข้าสเปคแล้ว" (กดซ้ำไม่ได้)
+function renderAddToSpecButton(product, attribute) {
+  const productKey = getProductKey(product);
+  const selectedItem = getCartItemByCategory(state.cartItems, product.category);
+  const isSelected = Boolean(selectedItem) && getProductKey(selectedItem) === productKey;
+
+  return isSelected
+    ? `
+      <button type="button" class="product-add-button product-add-button-added" disabled>
+        ${productAddCheckIcon}
+        เพิ่มเข้าสเปคแล้ว
+      </button>
+    `
+    : `<button type="button" class="product-add-button" ${attribute}="${escapeHtml(productKey)}">เพิ่มเข้าสเปค</button>`;
+}
+
 function renderProductCard(product) {
   const productKey = getProductKey(product);
   const imageUrl = getSafeImageUrl(product.imageUrl);
@@ -2635,14 +2654,7 @@ function renderProductCard(product) {
   const selectedItem = getCartItemByCategory(state.cartItems, product.category);
   const isSelected = Boolean(selectedItem) && getProductKey(selectedItem) === productKey;
 
-  const actionMarkup = isSelected
-    ? `
-      <button type="button" class="product-add-button product-add-button-added" disabled>
-        ${productAddCheckIcon}
-        เพิ่มเข้าสเปคแล้ว
-      </button>
-    `
-    : `<button type="button" class="product-add-button" data-add-product="${escapeHtml(productKey)}">เพิ่มเข้าสเปค</button>`;
+  const actionMarkup = renderAddToSpecButton(product, 'data-add-product');
 
   // ปุ่ม "ดูรายละเอียด" เปิด modal สเปคในตัวเว็บเอง (ไม่พาออกไปหน้าเว็บอื่น) - แสดงทุกการ์ด
   // ไม่ว่าจะถูกเพิ่มเข้าสเปคแล้วหรือยัง เพราะดึงข้อมูลจาก state.productsByKey ที่แคชไว้แล้ว
@@ -3154,14 +3166,43 @@ function openProductDetailModal(product) {
     }
   }
 
+  state.detailProduct = product;
+  renderProductDetailActions();
+
   productDetailModalEl.hidden = false;
   requestAnimationFrame(() => productDetailCloseButton?.focus());
 }
 
 function closeProductDetailModal() {
+  state.detailProduct = null;
+
   if (productDetailModalEl) {
     productDetailModalEl.hidden = true;
   }
+}
+
+// ปุ่มเพิ่มเข้าสเปคในหน้าต่างรายละเอียด (ตรงที่ว่างใต้ราคา) - ทำงานเหมือนปุ่มบนการ์ดทุกอย่าง
+// กดแล้วหน้าต่างยังเปิดอยู่ ปุ่มเปลี่ยนเป็น "เพิ่มเข้าสเปคแล้ว" ให้เห็นผลทันที ปิดหน้าต่างเองเมื่อพร้อม
+function renderProductDetailActions() {
+  if (productDetailActionsEl) {
+    productDetailActionsEl.innerHTML = state.detailProduct ? renderAddToSpecButton(state.detailProduct, 'data-detail-add') : '';
+  }
+}
+
+function handleProductDetailAdd(event) {
+  const button = event.target.closest('[data-detail-add]');
+  const product = state.detailProduct;
+
+  if (!button || !product) {
+    return;
+  }
+
+  state.cartItems = addCartItem(state.cartItems, product);
+  setCartStatus(`เพิ่ม ${getCategoryLabel(product.category)} เข้าสเปคแล้ว`);
+  renderCart();
+  renderManualCategories();
+  refreshProductCards();
+  renderProductDetailActions();
 }
 
 function handleCartAction(event) {
