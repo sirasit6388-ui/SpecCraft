@@ -1,4 +1,5 @@
 import { listProducts } from './products.service.js';
+import { calculateMonitorBudgetPlan } from './build-profiles.js';
 
 const requiredCategories = [
   'cpu',
@@ -34,8 +35,40 @@ export function calculateBudgetPlan(mode = 'work', budget = 0) {
   };
 }
 
+// options: { mode, budget, cpuBrand, includeMonitor, listProducts }
+//   includeMonitor: true = จัดสเปคพร้อมจอ ใช้สัดส่วนที่ย่อหมวดเดิมลงเพื่อเปิดที่ว่าง 8% ให้จอ (ดู build-profiles.js)
+//   ถ้าจัดพร้อมจอไม่ได้ (ไม่มีจอที่เสนอได้ หรืองบไม่พอ) จะจัดใหม่แบบไม่รวมจอด้วยสัดส่วนเดิมแทน ไม่ล้มทั้งชุด
 export async function createBuildRecommendation(options = {}) {
+  const wantsMonitor = Boolean(options.includeMonitor);
+
+  if (!wantsMonitor) {
+    return buildRecommendationOnce(options, false);
+  }
+
+  let fallbackReason;
+
+  try {
+    return await buildRecommendationOnce(options, true);
+  } catch (error) {
+    fallbackReason = error.code === 'NO_MONITOR'
+      ? 'ไม่มีจอที่เสนอได้ (ต้องมีของและราคาจริงจากร้าน)'
+      : 'งบนี้ยังไม่พอจัดสเปคพร้อมจอ';
+  }
+
+  const fallback = await buildRecommendationOnce(options, false);
+  fallback.monitorRequested = true;
+  fallback.notices = [...(fallback.notices || []), { code: 'monitor-unavailable', message: `${fallbackReason} จึงจัดสเปคแบบไม่รวมจอให้แทน` }];
+
+  return fallback;
+}
+
+async function buildRecommendationOnce(options, includeMonitor) {
   const plan = calculateBudgetPlan(options.mode, options.budget);
+
+  if (includeMonitor) {
+    plan.monitorTargets = calculateMonitorBudgetPlan(plan.mode, plan.budget).targets;
+  }
+
   const cpuBrand = normalizeCpuBrand(options.cpuBrand);
   const getProducts = options.listProducts || listProducts;
   const candidatesByCategory = {};
@@ -53,6 +86,18 @@ export async function createBuildRecommendation(options = {}) {
 
     const products = await getProducts(filters);
     candidatesByCategory[category] = normalizeProducts(products);
+  }
+
+  if (includeMonitor) {
+    const monitors = normalizeProducts(await getProducts({ category: 'monitor', limit: '1000' })).filter(isEligibleMonitor);
+
+    if (!monitors.length) {
+      const error = new Error('No eligible monitor available');
+      error.code = 'NO_MONITOR';
+      throw error;
+    }
+
+    candidatesByCategory.monitor = monitors;
   }
 
   const platform = selectPlatform(candidatesByCategory.cpu || [], candidatesByCategory.motherboard || [], plan);
@@ -87,6 +132,14 @@ export async function createBuildRecommendation(options = {}) {
 
     if (selected) {
       items.push(selected);
+    }
+  }
+
+  if (includeMonitor) {
+    const monitorSelected = selectBestProduct(candidatesByCategory.monitor, getCategoryTarget('monitor', plan));
+
+    if (monitorSelected) {
+      items.push(monitorSelected);
     }
   }
 
@@ -139,6 +192,9 @@ export async function createBuildRecommendation(options = {}) {
     compatibility,
     total,
     remaining: plan.budget - total,
+    monitorRequested: includeMonitor,
+    monitorIncluded: items.some((item) => item.category === 'monitor'),
+    notices: [],
     items
   };
 }
@@ -242,6 +298,11 @@ const STANDARD_CATEGORY_SHARE = 0.08;
 const COOLER_SHARE = 0.03;
 
 function getCategoryTarget(category, plan) {
+  // โหมดรวมจอ: ใช้เป้าหมายที่ย่อสัดส่วนแล้วเปิดที่ว่าง 8% ให้จอ (ดู build-profiles.js) แทนสัดส่วนเดิมของทุกหมวด
+  if (plan.monitorTargets) {
+    return plan.monitorTargets[category] || 0;
+  }
+
   if (category === 'cpu') {
     return plan.priorityParts.cpu;
   }
@@ -480,7 +541,7 @@ function selectPlatform(cpuCandidates, motherboardCandidates, plan) {
 // (กรณีหลังคือบิลด์นี้ประกอบไม่ได้จริงๆ ในงบที่เลือก - เช็ก total > plan.budget ท้ายฟังก์ชัน
 // createBuildRecommendation จะโยน error ตามเดิม)
 const DOWNGRADE_ORDER = [
-  'cpu-cooler', 'case', 'power-supply', 'internal-hard-drive',
+  'monitor', 'cpu-cooler', 'case', 'power-supply', 'internal-hard-drive',
   'memory', 'motherboard', 'cpu', 'video-card'
 ];
 
@@ -578,7 +639,7 @@ function upgradeBuildToBudget(items, candidatesByCategory, plan) {
 const MAX_BUDGET_SLACK = 3000;
 
 function spendRemainingBudget(items, candidatesByCategory, plan, currentTotal) {
-  const spendOrder = ['video-card', 'cpu', 'motherboard', 'memory', 'power-supply', 'internal-hard-drive', 'case', 'cpu-cooler'];
+  const spendOrder = ['video-card', 'cpu', 'motherboard', 'memory', 'power-supply', 'internal-hard-drive', 'case', 'cpu-cooler', 'monitor'];
   let currentItems = [...items];
   let total = currentTotal;
 
@@ -628,7 +689,7 @@ function spendRemainingBudget(items, candidatesByCategory, plan, currentTotal) {
 }
 
 function findBestUpgrade(items, candidatesByCategory, plan, currentTotal) {
-  const upgradeOrder = ['cpu', 'video-card', 'motherboard', 'memory', 'internal-hard-drive', 'power-supply', 'case', 'cpu-cooler'];
+  const upgradeOrder = ['cpu', 'video-card', 'motherboard', 'memory', 'internal-hard-drive', 'power-supply', 'case', 'cpu-cooler', 'monitor'];
   const currentByCategory = new Map(items.map((item) => [item.category, item]));
   const budget = plan.budget;
   const upgrades = [];
@@ -767,6 +828,10 @@ function isCompatibleUpgrade(category, product, currentByCategory) {
   }
 
   return true;
+}
+
+function isEligibleMonitor(monitor) {
+  return monitor?.inStock !== false && monitor?.priceIsEstimate !== true;
 }
 
 function getCompatibleCandidates(category, products, selected) {

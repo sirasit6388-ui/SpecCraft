@@ -17,7 +17,8 @@ export function createBuilderRoutes(options = {}) {
       const build = await recommendBuild({
         mode: body.mode,
         budget: body.budget,
-        cpuBrand: body.cpuBrand
+        cpuBrand: body.cpuBrand,
+        includeMonitor: body.includeMonitor === true
       });
 
       sendJson(response, 200, { build });
