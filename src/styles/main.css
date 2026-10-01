@@ -3579,3 +3579,26 @@ body {
   color: var(--maroon);
   cursor: default;
 }
+
+/* ---- ช่องติ๊ก "รวมจอ" ในฟอร์มจัดสเปคอัตโนมัติ ---- */
+.field-checkbox {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  font-size: 0.85rem;
+}
+
+.field-checkbox input {
+  height: 16px;
+  width: 16px;
+}
+
+/* ---- ข้อความแจ้งเมื่อจัดสเปคพร้อมจอไม่ได้ จึงถอยไปจัดแบบไม่มีจอแทน ---- */
+.build-notice {
+  background: #fef3c7;
+  border-radius: 10px;
+  color: #92400e;
+  font-size: 0.82rem;
+  margin: 0 0 10px;
+  padding: 8px 12px;
+}

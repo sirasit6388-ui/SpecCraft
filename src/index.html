@@ -13,7 +13,7 @@
          elevation pass" display font (hero h1 / section h2 only, per
          request) - loaded the same way. -->
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=Noto+Serif+Thai:wght@600;700&display=swap" />
-    <link rel="stylesheet" href="./styles/main.css?v=13" />
+    <link rel="stylesheet" href="./styles/main.css?v=14" />
     <link rel="stylesheet" href="./styles/theme-soft.css?v=25" />
   </head>
   <body>
@@ -158,6 +158,11 @@
             <label class="field">
               <span>งบประมาณ (บาท)</span>
               <input name="budget" type="number" min="19000" step="500" placeholder="ขั้นต่ำ 19,000 บาท" required />
+            </label>
+
+            <label class="field-checkbox">
+              <input type="checkbox" name="includeMonitor" />
+              <span>รวมจอมอนิเตอร์เข้าไปในสเปคด้วย</span>
             </label>
 
             <button class="primary-button" type="submit">จัดสเปคอัตโนมัติ</button>
@@ -430,6 +435,6 @@
       </section>
     </main>
 
-    <script type="module" src="./main.js?v=31"></script>
+    <script type="module" src="./main.js?v=32"></script>
   </body>
 </html>

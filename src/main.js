@@ -2447,7 +2447,8 @@ async function submitBuildForm(event) {
   const payload = {
     mode: formData.get('mode'),
     cpuBrand: formData.get('cpuBrand'),
-    budget: Number(formData.get('budget'))
+    budget: Number(formData.get('budget')),
+    includeMonitor: formData.get('includeMonitor') === 'on'
   };
 
   buildResultEl.hidden = false;
@@ -2461,7 +2462,12 @@ async function submitBuildForm(event) {
     });
 
     renderBuildResult(data.build);
-    setCartItems(data.build.items || [], 'เติมสเปคจากระบบอัตโนมัติแล้ว');
+    setCartItems(
+      data.build.items || [],
+      data.build.monitorRequested && !data.build.monitorIncluded
+        ? 'เติมสเปคจากระบบอัตโนมัติแล้ว (ไม่มีจอ ดูเหตุผลด้านบน)'
+        : 'เติมสเปคจากระบบอัตโนมัติแล้ว'
+    );
   } catch (error) {
     buildResultEl.innerHTML = createEmptyState({
       title: 'จัดสเปคไม่ได้',
@@ -2494,6 +2500,7 @@ function renderBuildResult(build) {
         <strong>${formatCurrency(build.total)}</strong>
       </div>
     </div>
+    ${build.notices?.length ? `<div class="build-notices">${build.notices.map((notice) => `<p class="build-notice">${escapeHtml(notice.message)}</p>`).join('')}</div>` : ''}
     <div class="build-meta">
       <span>งบ ${formatCurrency(build.budget)}</span>
       ${build.socket ? `<span>Socket ${escapeHtml(build.socket)}</span>` : ''}
