@@ -8,7 +8,11 @@ const state = {
   filters: {
     brand: '',
     series: '',
-    socket: ''
+    socket: '',
+    minRefreshRate: '',
+    screenSize: '',
+    resolution: '',
+    panelType: ''
   },
   cartItems: hydrateCartItems(localStorage.getItem('pc-build-cart')),
   categoryCounts: new Map(),
@@ -78,6 +82,17 @@ const filterForm = document.querySelector('[data-filter-form]');
 const brandFilterEl = document.querySelector('[data-filter-brand]');
 const seriesFilterEl = document.querySelector('[data-filter-series]');
 const socketFilterEl = document.querySelector('[data-filter-socket]');
+const monitorFilterEls = [
+  document.querySelector('[data-filter-refresh-rate]'),
+  document.querySelector('[data-filter-screen-size]'),
+  document.querySelector('[data-filter-resolution]'),
+  document.querySelector('[data-filter-panel-type]')
+].filter(Boolean);
+const MONITOR_FILTER_KEYS = ['minRefreshRate', 'screenSize', 'resolution', 'panelType'];
+
+function createEmptyFilters() {
+  return { brand: '', series: '', socket: '', minRefreshRate: '', screenSize: '', resolution: '', panelType: '' };
+}
 const buildForm = document.querySelector('[data-build-form]');
 const buildResultEl = document.querySelector('[data-build-result]');
 const savedBuildResultEl = document.querySelector('[data-saved-build-result]');
@@ -140,12 +155,21 @@ const authCloseButton = document.querySelector('[data-auth-close]');
 const authModeButtons = document.querySelectorAll('[data-auth-mode]');
 const authForm = document.querySelector('[data-auth-form]');
 const authSubmitButton = document.querySelector('[data-auth-submit]');
+const authRegisterOnlyEls = document.querySelectorAll('[data-auth-register-only]');
 const authModalStatusEl = document.querySelector('[data-auth-modal-status]');
 const confirmModalEl = document.querySelector('[data-confirm-modal]');
 const confirmMessageEl = document.querySelector('[data-confirm-message]');
 const confirmOkButton = document.querySelector('[data-confirm-ok]');
 const confirmCancelButton = document.querySelector('[data-confirm-cancel]');
 let resolveConfirmDialog = null;
+const productDetailModalEl = document.querySelector('[data-product-detail-modal]');
+const productDetailCloseButton = document.querySelector('[data-product-detail-close]');
+const productDetailMediaEl = document.querySelector('[data-product-detail-media]');
+const productDetailTagsEl = document.querySelector('[data-product-detail-tags]');
+const productDetailNameEl = document.querySelector('[data-product-detail-name]');
+const productDetailPriceEl = document.querySelector('[data-product-detail-price]');
+const productDetailSpecsEl = document.querySelector('[data-product-detail-specs]');
+const productDetailNoteEl = document.querySelector('[data-product-detail-note]');
 
 const categoryLabels = {
   cpu: 'CPU',
@@ -168,8 +192,13 @@ const manualCategoryOrder = [
   'internal-hard-drive',
   'power-supply',
   'case',
-  'cpu-cooler'
+  'cpu-cooler',
+  'monitor'
 ];
+
+// หมวดที่เป็นตัวเลือกเสริม: แสดงในรายการ "จัดสเปคเอง" เฉพาะเมื่อมีสินค้าในฐานข้อมูลจริง
+// (หรือมีชิ้นที่เลือกไว้ในสเปคอยู่แล้ว) กันไม่ให้ผู้ใช้กดเข้าไปเจอหมวดว่างเปล่า
+const optionalManualCategories = new Set(['monitor']);
 
 // เรียงรายการของสเปคที่บันทึกไว้ตามลำดับหมวดหมู่ที่อ่านง่าย (เหมือนใน "จัดสเปคเอง")
 // แทนที่จะใช้ลำดับดิบจากฐานข้อมูล (build_items.id) ซึ่งเรียงตามลำดับที่เพิ่ม/แก้ใน
@@ -329,9 +358,18 @@ confirmModalEl?.addEventListener('click', (event) => {
     settleConfirmDialog(false);
   }
 });
+productDetailCloseButton?.addEventListener('click', closeProductDetailModal);
+productDetailModalEl?.addEventListener('click', (event) => {
+  if (event.target === productDetailModalEl) {
+    closeProductDetailModal();
+  }
+});
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape' && confirmModalEl && !confirmModalEl.hidden) {
     settleConfirmDialog(false);
+  }
+  if (event.key === 'Escape' && productDetailModalEl && !productDetailModalEl.hidden) {
+    closeProductDetailModal();
   }
 });
 searchForm.addEventListener('submit', (event) => {
@@ -346,7 +384,11 @@ filterForm.addEventListener('change', (event) => {
   const nextFilters = {
     brand: formData.get('brand') || '',
     series: brandChanged ? '' : (formData.get('series') || ''),
-    socket: brandChanged ? '' : (formData.get('socket') || '')
+    socket: brandChanged ? '' : (formData.get('socket') || ''),
+    minRefreshRate: formData.get('minRefreshRate') || '',
+    screenSize: formData.get('screenSize') || '',
+    resolution: formData.get('resolution') || '',
+    panelType: formData.get('panelType') || ''
   };
 
   if (brandChanged) {
@@ -360,7 +402,7 @@ filterForm.addEventListener('change', (event) => {
   loadProducts();
 });
 filterForm.addEventListener('reset', () => {
-  state.filters = { brand: '', series: '', socket: '' };
+  state.filters = createEmptyFilters();
   resetProductPage();
   loadProductFilters();
   setTimeout(loadProducts);
@@ -652,18 +694,70 @@ function setAuthMode(mode) {
     authSubmitButton.textContent = state.authMode === 'register' ? 'สมัครสมาชิก' : 'เข้าสู่ระบบ';
   }
 
+  // ช่องอีเมลแสดงเฉพาะตอนสมัครสมาชิก
+  authRegisterOnlyEls.forEach((element) => {
+    element.hidden = state.authMode !== 'register';
+  });
+
+  // ให้ตัวจัดการรหัสผ่านของเบราว์เซอร์รู้ว่ากำลังตั้งรหัสใหม่หรือกรอกรหัสเดิม
+  const passwordInput = authForm?.elements?.password;
+  if (passwordInput) {
+    passwordInput.autocomplete = state.authMode === 'register' ? 'new-password' : 'current-password';
+  }
+
   setAuthModalStatus('');
 }
 
+// รูปแบบเดียวกับ isValidEmail ฝั่งเซิร์ฟเวอร์ (server/services/auth.service.js)
+function isValidEmailAddress(email) {
+  return email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+// ข้อความ error สั้นๆ จากเซิร์ฟเวอร์ (ภาษาอังกฤษ) -> ข้อความไทยสำหรับผู้ใช้ ข้อความอื่นที่ไม่รู้จักใช้ข้อความกลางแทน
+// (ไม่โชว์ข้อความดิบจากฐานข้อมูลให้ผู้ใช้เห็น)
+function getAuthErrorMessage(error, isRegister) {
+  const message = String(error?.message || '');
+
+  if (isRegister) {
+    if (message === 'This email is already registered') {
+      return 'อีเมลนี้ถูกใช้สมัครสมาชิกแล้ว';
+    }
+
+    if (message === 'This username is already taken') {
+      return 'ชื่อผู้ใช้นี้ถูกใช้แล้ว กรุณาใช้ชื่ออื่น';
+    }
+
+    if (message === 'A valid email address is required') {
+      return 'รูปแบบอีเมลไม่ถูกต้อง';
+    }
+  }
+
+  if (error?.status === 429) {
+    return isRegister ? 'สมัครสมาชิกบ่อยเกินไป กรุณาลองใหม่ในอีก 1 ชั่วโมง' : 'พยายามเข้าสู่ระบบบ่อยเกินไป กรุณาลองใหม่ในอีก 15 นาที';
+  }
+
+  return isRegister ? 'สมัครสมาชิกไม่สำเร็จ กรุณาตรวจสอบข้อมูล' : 'เข้าสู่ระบบไม่สำเร็จ กรุณาตรวจสอบข้อมูล';
+}
+
 async function submitAuth(url, successMessage) {
+  const isRegister = state.authMode === 'register';
   const formData = new FormData(authForm);
   const payload = {
     username: String(formData.get('username') || '').trim(),
     password: String(formData.get('password') || '')
   };
 
+  if (isRegister) {
+    payload.email = String(formData.get('email') || '').trim().toLowerCase();
+  }
+
   if (!payload.username || payload.password.length < 6) {
     setAuthModalStatus('กรอก username และ password อย่างน้อย 6 ตัวอักษร');
+    return;
+  }
+
+  if (isRegister && !isValidEmailAddress(payload.email)) {
+    setAuthModalStatus('กรอกอีเมลให้ถูกต้อง (ใช้สำหรับกู้คืนรหัสผ่านเมื่อลืม)');
     return;
   }
 
@@ -681,8 +775,8 @@ async function submitAuth(url, successMessage) {
     renderAuthState();
     setAuthModalStatus('');
     await loadSavedBuilds();
-  } catch {
-    setAuthModalStatus('เข้าสู่ระบบไม่สำเร็จ กรุณาตรวจสอบข้อมูล');
+  } catch (error) {
+    setAuthModalStatus(getAuthErrorMessage(error, isRegister));
   }
 }
 
@@ -1786,7 +1880,7 @@ function handleManualCategoryAction(event) {
   state.category = category;
   setView('products');
   state.search = '';
-  state.filters = { brand: '', series: '', socket: '' };
+  state.filters = createEmptyFilters();
   resetProductPage();
   searchForm.reset();
   filterForm.reset();
@@ -1818,6 +1912,30 @@ function renderFilterOptions(filters) {
   renderSelectOptions(brandFilterEl, filters.brands || [], 'แบรนด์ทั้งหมด');
   renderSelectOptions(seriesFilterEl, filters.series || [], 'ซีรีส์ทั้งหมด');
   renderSelectOptions(socketFilterEl, filters.sockets || [], 'ซ็อกเก็ตทั้งหมด');
+
+  if (state.category === 'monitor') {
+    const monitor = filters.monitor || {};
+    renderOptionObjects(document.querySelector('[data-filter-refresh-rate]'), monitor.refreshRates || []);
+    renderOptionObjects(document.querySelector('[data-filter-screen-size]'), monitor.screenSizes || []);
+    renderOptionObjects(document.querySelector('[data-filter-resolution]'), monitor.resolutions || []);
+    renderOptionObjects(document.querySelector('[data-filter-panel-type]'), monitor.panelTypes || []);
+  }
+}
+
+// ตัวเลือกแบบ { value, label, count }: แสดงเฉพาะป้าย (ไม่แสดงจำนวน) และคงค่าที่เลือกไว้เดิม
+// (ตัวเลือกที่ไม่มีสินค้าเลยถูกกรองออกที่ API แล้ว)
+function renderOptionObjects(select, options) {
+  if (!select) {
+    return;
+  }
+
+  const selectedValue = String(state.filters[select.name] || '');
+
+  select.innerHTML = [
+    '<option value="">ทั้งหมด</option>',
+    ...options.map((option) => `<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`)
+  ].join('');
+  select.value = options.some((option) => String(option.value) === selectedValue) ? selectedValue : '';
 }
 
 function renderSelectOptions(select, values, emptyLabel) {
@@ -1865,8 +1983,17 @@ const manualTrashIcon = `
   </svg>
 `;
 
+function getVisibleManualCategories() {
+  return manualCategoryOrder.filter(
+    (category) =>
+      !optionalManualCategories.has(category) ||
+      (state.categoryCounts.get(category) || 0) > 0 ||
+      Boolean(getCartItemByCategory(state.cartItems, category))
+  );
+}
+
 function renderManualCategories() {
-  manualCategoriesEl.innerHTML = manualCategoryOrder.map((category) => {
+  manualCategoriesEl.innerHTML = getVisibleManualCategories().map((category) => {
     const selectedItem = getCartItemByCategory(state.cartItems, category);
     const label = getCategoryLabel(category);
 
@@ -2139,7 +2266,24 @@ function buildCompatibilitySelection() {
   return selected;
 }
 
+// ตัวกรองเฉพาะหมวดจอ: ช่อง "ร้านค้าในไทย" แสดงเฉพาะหมวด Monitor ส่วนช่อง "ซีรีส์/ซ็อกเก็ต"
+// (ใช้กับ CPU/เมนบอร์ด/การ์ดจอ) ซ่อนในหมวดจอเพราะไม่มีความหมายกับจอ
+function syncCategoryFilterVisibility() {
+  const isMonitor = state.category === 'monitor';
+
+  // หมวดจอมีช่องกรองมากกว่าหมวดอื่น (แบรนด์ + 4 สเปค + ปุ่มล้าง) ใช้ตารางแบบยืดหยุ่นแทนตาราง 3 ช่อง + ปุ่มแคบของหมวดอื่น
+  filterForm.classList.toggle('filters-monitor', isMonitor);
+
+  document.querySelectorAll('[data-filter-monitor-only]').forEach((element) => {
+    element.hidden = !isMonitor;
+  });
+  document.querySelectorAll('[data-filter-not-monitor]').forEach((element) => {
+    element.hidden = isMonitor;
+  });
+}
+
 async function loadProducts() {
+  syncCategoryFilterVisibility();
   productsEl.innerHTML = renderProductSkeletons();
   renderPagination(0);
   currentCategoryEl.textContent = state.category ? getCategoryLabel(state.category) : 'สินค้าทั้งหมด';
@@ -2164,6 +2308,15 @@ async function loadProducts() {
   }
 
   for (const [key, value] of Object.entries(state.filters)) {
+    // ตัวกรองสเปคจอ (Hz/ขนาด/ความละเอียด/ชนิดแผง) ใช้เฉพาะหมวดจอ และซีรีส์/ซ็อกเก็ตไม่ใช้กับจอ
+    if (MONITOR_FILTER_KEYS.includes(key) && state.category !== 'monitor') {
+      continue;
+    }
+
+    if ((key === 'series' || key === 'socket') && state.category === 'monitor') {
+      continue;
+    }
+
     if (value) {
       params.set(key, value);
     }
@@ -2470,14 +2623,17 @@ function renderProductCard(product) {
   const image = imageUrl
     ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(product.name)}" loading="lazy" />`
     : `<div class="image-placeholder" data-category="${escapeHtml(product.category)}">${getCategoryIcon(product.category)}<span>${escapeHtml(getCategoryLabel(product.category))}</span></div>`;
-  const specPills = renderSpecPills(product);
+  const isMonitor = product.category === 'monitor';
+  const specPills = isMonitor ? '' : renderSpecPills(product);
+  const monitorSummary = isMonitor
+    ? [Number(product.screenSizeInch) > 0 ? `${formatNumber(product.screenSizeInch)}"` : '', ...getMonitorSummaryParts(product)].filter(Boolean).join(' / ')
+    : '';
 
   // การ์ดของสินค้าที่ตรงกับสินค้าที่เลือกไว้แล้วในหมวดนั้น (เทียบด้วย category:id
   // ผ่าน getProductKey) ให้ปุ่มเปลี่ยนเป็นสถานะยืนยัน "เพิ่มเข้าสเปคแล้ว" (มีเครื่องหมายถูก
-  // กดซ้ำไม่ได้) แทนปุ่มเพิ่มปกติ พร้อมลิงก์ "ดูรายละเอียด" ไปหน้าสินค้าจริงถ้ามี productUrl
+  // กดซ้ำไม่ได้) แทนปุ่มเพิ่มปกติ
   const selectedItem = getCartItemByCategory(state.cartItems, product.category);
   const isSelected = Boolean(selectedItem) && getProductKey(selectedItem) === productKey;
-  const detailUrl = getSafeImageUrl(product.productUrl);
 
   const actionMarkup = isSelected
     ? `
@@ -2485,9 +2641,13 @@ function renderProductCard(product) {
         ${productAddCheckIcon}
         เพิ่มเข้าสเปคแล้ว
       </button>
-      ${detailUrl ? `<a class="product-detail-link" href="${escapeHtml(detailUrl)}" target="_blank" rel="noopener noreferrer">ดูรายละเอียด</a>` : ''}
     `
     : `<button type="button" class="product-add-button" data-add-product="${escapeHtml(productKey)}">เพิ่มเข้าสเปค</button>`;
+
+  // ปุ่ม "ดูรายละเอียด" เปิด modal สเปคในตัวเว็บเอง (ไม่พาออกไปหน้าเว็บอื่น) - แสดงทุกการ์ด
+  // ไม่ว่าจะถูกเพิ่มเข้าสเปคแล้วหรือยัง เพราะดึงข้อมูลจาก state.productsByKey ที่แคชไว้แล้ว
+  // จึงไม่ต้องยิง API เพิ่ม
+  const detailButton = `<button type="button" class="product-detail-trigger" data-view-details="${escapeHtml(productKey)}">ดูรายละเอียด</button>`;
 
   return `
     <article class="product-card ${isSelected ? 'product-card-selected' : ''}" data-product-key="${escapeHtml(productKey)}">
@@ -2498,8 +2658,10 @@ function renderProductCard(product) {
       </div>
       <h3>${escapeHtml(product.name)}</h3>
       ${specPills ? `<div class="product-specs">${specPills}</div>` : ''}
+      ${monitorSummary ? `<p class="product-spec-line">${escapeHtml(monitorSummary)}</p>` : ''}
       <div class="price">${formatCurrency(product.price)}</div>
       ${actionMarkup}
+      ${detailButton}
     </article>
   `;
 }
@@ -2577,8 +2739,69 @@ function renderCart() {
   localStorage.setItem('pc-build-cart', JSON.stringify(state.cartItems));
 }
 
+// ความละเอียดจอ: ฐานข้อมูลเก็บเป็น [กว้าง, สูง] -> "1920 x 1080" (รับสตริงที่เป็นข้อความอยู่แล้วด้วย)
+function formatMonitorResolution(value) {
+  if (Array.isArray(value) && value.length >= 2 && Number(value[0]) > 0 && Number(value[1]) > 0) {
+    return `${Number(value[0])} x ${Number(value[1])}`;
+  }
+
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+// ข้อมูลสรุปของจอที่โชว์ใต้ชื่อสินค้าในการ์ด เช่น: IPS / 1920 x 1080 / 4ms / 60Hz / Aspect Ratio 16:9
+// (เรียงเหมือนบรรทัดสรุปของหน้าร้านค้า; ค่าไหนไม่มีข้อมูลจะไม่แสดง ไม่เดา)
+function getMonitorSummaryParts(item) {
+  const parts = [];
+  const resolution = formatMonitorResolution(item.resolution);
+
+  if (item.panelType) {
+    parts.push(String(item.panelType));
+  }
+
+  if (resolution) {
+    parts.push(resolution);
+  }
+
+  if (Number(item.responseTimeMs) > 0) {
+    parts.push(`${formatNumber(item.responseTimeMs)}ms`);
+  }
+
+  if (Number(item.refreshRate) > 0) {
+    parts.push(`${formatNumber(item.refreshRate)}Hz`);
+  }
+
+  if (item.aspectRatio) {
+    parts.push(`Aspect Ratio ${item.aspectRatio}`);
+  }
+
+  return parts;
+}
+
 function getSpecHighlights(item) {
   const parts = [];
+
+  // จอ: ขนาด / ชนิดแผง / ความละเอียด / รีเฟรชเรต (สั้นพอสำหรับข้อความใต้ชื่อในตะกร้า)
+  if (item.category === 'monitor') {
+    if (Number(item.screenSizeInch) > 0) {
+      parts.push(`${formatNumber(item.screenSizeInch)}"`);
+    }
+
+    if (item.panelType) {
+      parts.push(String(item.panelType));
+    }
+
+    const resolution = formatMonitorResolution(item.resolution);
+
+    if (resolution) {
+      parts.push(resolution);
+    }
+
+    if (Number(item.refreshRate) > 0) {
+      parts.push(`${formatNumber(item.refreshRate)}Hz`);
+    }
+
+    return parts;
+  }
 
   if (item.category === 'memory' && item.memoryGb) {
     parts.push(`${formatNumber(item.memoryGb)} GB`);
@@ -2618,6 +2841,18 @@ function renderSpecPills(item) {
 }
 
 function handleProductAction(event) {
+  const detailButton = event.target.closest('[data-view-details]');
+
+  if (detailButton) {
+    const product = state.productsByKey.get(detailButton.dataset.viewDetails);
+
+    if (product) {
+      openProductDetailModal(product);
+    }
+
+    return;
+  }
+
   const button = event.target.closest('[data-add-product]');
 
   if (!button) {
@@ -2635,6 +2870,298 @@ function handleProductAction(event) {
   renderCart();
   renderManualCategories();
   refreshProductCards();
+}
+
+// กล่อง "ดูรายละเอียด" - โชว์สเปคเชิงลึกของสินค้าในตัวเว็บเอง (ไม่พาออกไปหน้าอื่น)
+// อ่านจาก state.productsByKey ที่แคชไว้อยู่แล้วตอนโหลดรายการสินค้า จึงไม่ยิง API ซ้ำ
+// ตารางสเปคเต็มจาก Banana (specs.banana_specs = [[ชื่อฟิลด์, ค่า], ...]) - ใช้แสดงตรงๆ แทนสเปคย่อยจากฐานข้อมูลเดิม
+// ตรวจรูปแบบก่อนใช้: ต้องเป็นคู่ [ข้อความ, ข้อความ] อย่างน้อย 3 แถว ไม่งั้นถอยไปใช้สเปคเดิม
+function getBananaSpecRows(product) {
+  if (product.category === 'cpu' || !Array.isArray(product.bananaSpecs)) {
+    return [];
+  }
+
+  // ไม่แสดงแถวการรับประกัน (Warranty) - ข้อมูลเดิมในฐานข้อมูลอาจมีแถวนี้อยู่แล้ว จึงกรองตอนแสดงผลด้วย
+  const rows = product.bananaSpecs.filter(
+    (row) =>
+      Array.isArray(row) &&
+      row.length >= 2 &&
+      typeof row[0] === 'string' &&
+      typeof row[1] === 'string' &&
+      row[0] &&
+      row[1] &&
+      !/warranty|รับประกัน/i.test(row[0])
+  );
+
+  return rows.length >= 3 ? rows.map((row) => [row[0], row[1]]) : [];
+}
+
+function buildProductDetailSpecs(product) {
+  const bananaRows = getBananaSpecRows(product);
+
+  if (bananaRows.length) {
+    return bananaRows;
+  }
+
+  const items = [];
+  const category = product.category;
+  const isCpu = category === 'cpu';
+  const hasValue = (value) => value !== null && value !== undefined && value !== '' && value !== false;
+  const add = (label, value) => {
+    // ข้อความ "null" = ค่าว่างที่หลุดมาจากข้อมูลต้นทาง ไม่แสดง
+    if (hasValue(value) && String(value).trim().toLowerCase() !== 'null') {
+      items.push([label, String(value)]);
+    }
+  };
+
+  // ---------- ทุกหมวด (CPU มีลำดับแถวของตัวเอง ดูด้านล่าง) ----------
+  if (!isCpu) {
+    add('Socket', product.socket);
+  }
+
+  // ---------- CPU ---------- (ลำดับและชื่อแถวเหมือนตารางสเปคของร้านค้า; แถวไหนไม่มีข้อมูลจะไม่แสดง ไม่เดา)
+  if (isCpu) {
+    const brand = String(product.brand ?? '').trim();
+    add('CPU Brand', brand);
+    add('CPU Series', /^(n\/a|na|-|—)$/i.test(String(product.cpuSeries ?? '').trim()) ? null : product.cpuSeries);
+    // "Intel Core i5-12400F" -> "Core i5-12400F"
+    add('CPU Model', String(product.name ?? '').replace(/^(intel|amd)\s+/i, '').trim());
+    // ตัวอย่างในตารางร้านค้า: "AMD AM4" / "Intel LGA-1700" - เติมชื่อแบรนด์หน้า socket ถ้ายังไม่มี
+    if (product.socket) {
+      const socket = String(product.socket);
+      add('CPU Socket Type', brand && !socket.toLowerCase().startsWith(brand.toLowerCase()) ? `${brand} ${socket}` : socket);
+    }
+    add('Core Name', product.microarchitecture);
+
+    // รวมคอร์+เธรดเป็นบรรทัดเดียว เช่น "6 Core / 12 Threads" (ถ้าไม่มี threads ก็โชว์เฉพาะคอร์)
+    // Threads มาจาก server/scripts/apply-cpu-detailed-specs.js - ไม่ใช่ทุกรุ่นจะมี (ดูหมายเหตุท้ายกล่อง)
+    if (hasValue(product.coreCount)) {
+      const cores = `${formatNumber(product.coreCount)} Core`;
+      add('# of Cores', hasValue(product.threads) ? `${cores} / ${formatNumber(product.threads)} Threads` : cores);
+    } else if (hasValue(product.threads)) {
+      add('# of Threads', formatNumber(product.threads));
+    }
+
+    // รวมความเร็ว Base/Boost เป็นบรรทัดเดียว เช่น "2.5 GHz up to 4.4 GHz"
+    if (product.coreClockGhz || product.boostClockGhz) {
+      const base = product.coreClockGhz ? `${formatNumber(product.coreClockGhz)} GHz` : '';
+      const boost = product.boostClockGhz ? `${formatNumber(product.boostClockGhz)} GHz` : '';
+      add('Operating Frequency', base && boost ? `${base} up to ${boost}` : base || `Boost ${boost}`);
+    }
+
+    add('L1 Cache', product.l1Cache && formatCacheSize(product.l1Cache));
+    add('L2 Cache', product.l2Cache && formatCacheSize(product.l2Cache));
+    add('L3 Cache', product.l3Cache && formatCacheSize(product.l3Cache));
+    // cacheText คือฟิลด์รวม (ส่วนใหญ่มาจากฝั่ง Intel ARK ซึ่งไม่แยก L2/L3) - โชว์เฉพาะตอนไม่มี L2/L3 แยก กันซ้ำซ้อน
+    if (!product.l2Cache && !product.l3Cache) {
+      add('Cache', product.cacheText);
+    }
+
+    // แถวเหล่านี้มีเฉพาะ CPU ที่ Banana ขายและอ่านตารางได้ (ดู apply-cpu-banana-extras.js)
+    // Banana บางรุ่นเขียนค่าเป็น "N/A" (เช่น Ryzen 3 3200G ช่อง Manufacturing Tech) - ไม่มีข้อมูล จึงไม่แสดงแถวนั้น
+    const addKnown = (label, value) => {
+      if (!/^(n\/a|na|-|—)$/i.test(String(value ?? '').trim())) {
+        add(label, value);
+      }
+    };
+    addKnown('Manufacturing Tech', product.cpuProcess);
+    addKnown('64Bit Support', product.cpu64bit);
+    addKnown('Virtualization Technology Support', product.cpuVirtualization);
+
+    add('Thermal Design Power', product.tdp && `${formatNumber(product.tdp)} W`);
+    // สองแถวนี้ไม่มีในตารางของร้านค้า แต่เป็นข้อมูลที่เรามีและมีประโยชน์ตอนเลือกซื้อ
+    add('Integrated Graphics', product.graphics);
+    add('Thermal Solution', product.thermalSolution);
+  }
+
+  // ---------- เมนบอร์ด ----------
+  if (category === 'motherboard') {
+    add('ฟอร์มแฟคเตอร์ (Form Factor)', product.formFactor);
+    add('จำนวนช่องแรม (Memory Slots)', hasValue(product.memorySlots) && `${formatNumber(product.memorySlots)} ช่อง`);
+    add('แรมสูงสุด (Max Memory)', hasValue(product.maxMemoryGb) && `${formatNumber(product.maxMemoryGb)} GB`);
+    add('สี (Color)', product.color);
+  }
+
+  // ---------- การ์ดจอ ----------
+  if (category === 'video-card') {
+    add('ชิปกราฟิก (Chipset)', product.chipset);
+    add('หน่วยความจำ (VRAM)', hasValue(product.vramGb) && `${formatNumber(product.vramGb)} GB`);
+    add('Core Clock', hasValue(product.gpuCoreClockMhz) && `${formatNumber(product.gpuCoreClockMhz)} MHz`);
+    add('Boost Clock', hasValue(product.gpuBoostClockMhz) && `${formatNumber(product.gpuBoostClockMhz)} MHz`);
+    add('ความยาวการ์ด (Length)', hasValue(product.gpuLength) && `${formatNumber(product.gpuLength)} mm`);
+    add('สี (Color)', product.color);
+  }
+
+  // ---------- แรม ----------
+  if (category === 'memory') {
+    add('ชนิดและความเร็ว (Type / Speed)', product.memoryType && product.memorySpeedMhz ? `${product.memoryType}-${product.memorySpeedMhz}` : product.memoryType || (product.memorySpeedMhz && `${product.memorySpeedMhz} MHz`));
+    add('ความจุรวม (Capacity)', hasValue(product.memoryGb) && `${formatNumber(product.memoryGb)} GB`);
+    if (hasValue(product.memoryModuleCount) && hasValue(product.memoryModuleGb)) {
+      add('จำนวนแท่ง (Modules)', `${formatNumber(product.memoryModuleCount)} x ${formatNumber(product.memoryModuleGb)} GB`);
+    }
+    add('CAS Latency', hasValue(product.casLatency) && `CL${product.casLatency}`);
+    add('First Word Latency', hasValue(product.firstWordLatencyNs) && `${formatNumber(product.firstWordLatencyNs)} ns`);
+    add('สี (Color)', product.color);
+  }
+
+  // ---------- ที่เก็บข้อมูล ----------
+  if (category === 'internal-hard-drive') {
+    const type = String(product.caseType ?? '');
+    add('ชนิด (Type)', /^\d+$/.test(type) ? `HDD ${type} RPM` : type);
+    add('ความจุ (Capacity)', hasValue(product.storageCapacityGb) && formatStorageCapacity(product.storageCapacityGb));
+    const form = String(product.formFactor ?? '');
+    add('ฟอร์มแฟคเตอร์ (Form Factor)', /^\d+(\.\d+)?$/.test(form) ? `${form}"` : form);
+    add('อินเทอร์เฟซ (Interface)', product.storageInterface);
+    add('แคช (Cache)', hasValue(product.storageCacheMb) && `${formatNumber(product.storageCacheMb)} MB`);
+  }
+
+  // ---------- พาวเวอร์ซัพพลาย ----------
+  if (category === 'power-supply') {
+    add('กำลังไฟ (Wattage)', hasValue(product.wattage) && `${formatNumber(product.wattage)} W`);
+    add('มาตรฐานประหยัดไฟ (Efficiency)', formatPsuEfficiency(product.efficiency));
+    add('ระบบสายไฟ (Modular)', formatPsuModular(product.modular));
+    add('ขนาด (Form Factor)', product.caseType);
+    add('สี (Color)', product.color);
+  }
+
+  // ---------- เคส ----------
+  if (category === 'case') {
+    add('ประเภทเคส (Type)', product.caseType);
+    add('ฝาข้าง (Side Panel)', product.sidePanel);
+    add('ปริมาตร (Volume)', hasValue(product.externalVolume) && `${formatNumber(product.externalVolume)} L`);
+    add('ช่องใส่ฮาร์ดดิสก์ 3.5"', hasValue(product.internal35Bays) && `${formatNumber(product.internal35Bays)} ช่อง`);
+    add('การ์ดจอยาวสุด (Max GPU Length)', hasValue(product.maxGpuLength) && `${formatNumber(product.maxGpuLength)} mm`);
+    add('ฮีตซิงก์สูงสุด (Max CPU Cooler)', hasValue(product.maxCpuCoolerHeight) && `${formatNumber(product.maxCpuCoolerHeight)} mm`);
+    add('พาวเวอร์ซัพพลายที่แถมมา', hasValue(product.includedPsuWatt) && `${formatNumber(product.includedPsuWatt)} W`);
+    add('สี (Color)', product.color);
+  }
+
+  // ---------- จอมอนิเตอร์ ----------
+  if (category === 'monitor') {
+    add('ขนาดหน้าจอ (Screen Size)', Number(product.screenSizeInch) > 0 && `${formatNumber(product.screenSizeInch)} นิ้ว`);
+    add('ชนิดแผงจอ (Panel Type)', product.panelType);
+    add('ความละเอียด (Resolution)', formatMonitorResolution(product.resolution));
+    add('รีเฟรชเรต (Refresh Rate)', Number(product.refreshRate) > 0 && `${formatNumber(product.refreshRate)} Hz`);
+    add('เวลาตอบสนอง (Response Time)', Number(product.responseTimeMs) > 0 && `${formatNumber(product.responseTimeMs)} ms`);
+    add('อัตราส่วนภาพ (Aspect Ratio)', product.aspectRatio);
+  }
+
+  // ---------- ชุดระบายความร้อน CPU ----------
+  if (category === 'cpu-cooler') {
+    // มีขนาดหม้อน้ำ = ชุดน้ำแน่นอน; ถ้าไม่มี ไม่ยืนยันว่าเป็นชุดลม (อาจเป็นชุดน้ำที่ข้อมูลต้นทางไม่ระบุขนาด) จึงไม่โชว์ชนิด
+    add('ชนิด (Type)', hasValue(product.radiatorSize) && 'ระบายความร้อนด้วยน้ำ (Liquid)');
+    add('ขนาดหม้อน้ำ (Radiator)', hasValue(product.radiatorSize) && `${formatNumber(product.radiatorSize)} mm`);
+    add('ความสูง (Height)', hasValue(product.coolerHeight) && `${formatNumber(product.coolerHeight)} mm`);
+    add('ความเร็วพัดลม (Fan Speed)', formatRange(product.rpm, 'RPM'));
+    add('ระดับเสียง (Noise Level)', formatRange(product.noiseLevelDb, 'dB'));
+    add('สี (Color)', product.color);
+  }
+
+  return items;
+}
+
+// ค่าที่เป็นช่วง เช่น [600, 3000] -> "600 - 3,000 RPM" ค่าเดี่ยว -> "1,550 RPM"
+function formatRange(value, unit) {
+  if (Array.isArray(value)) {
+    const nums = value.filter((n) => n !== null && n !== undefined && n !== '');
+    if (!nums.length) return null;
+    const text = nums.length > 1 && nums[0] !== nums[nums.length - 1]
+      ? `${formatNumber(nums[0])} - ${formatNumber(nums[nums.length - 1])}`
+      : formatNumber(nums[0]);
+    return `${text} ${unit}`;
+  }
+  return value !== null && value !== undefined && value !== '' ? `${formatNumber(value)} ${unit}` : null;
+}
+
+// ความจุจาก GB: 2000 -> "2 TB", 500 -> "500 GB"
+function formatStorageCapacity(gb) {
+  const value = Number(gb);
+  if (!Number.isFinite(value) || value <= 0) return null;
+  return value >= 1000 ? `${Number((value / 1000).toFixed(2))} TB` : `${Number(value.toFixed(1))} GB`;
+}
+
+// ข้อมูลต้นทางเก็บเป็นคำสั้นๆ (gold/bronze/plus ...) แปลงเป็นชื่อมาตรฐาน 80 PLUS
+function formatPsuEfficiency(value) {
+  const map = { plus: '80+ (White)', bronze: '80+ Bronze', silver: '80+ Silver', gold: '80+ Gold', platinum: '80+ Platinum', titanium: '80+ Titanium' };
+  const key = String(value ?? '').trim().toLowerCase();
+  return key ? map[key] || String(value) : null;
+}
+
+// modular: "Full" / "Semi" / false (ไม่ถอดสาย) - ค่าว่างแปลว่าไม่มีข้อมูล ไม่ใช่ "ไม่ modular"
+function formatPsuModular(value) {
+  if (value === false) return 'Non-Modular (สายติดตาย)';
+  if (typeof value !== 'string' || !value.trim()) return null;
+  if (/^full$/i.test(value)) return 'Full Modular';
+  if (/^semi$/i.test(value)) return 'Semi Modular';
+  return value;
+}
+
+// "3MB" -> "3 MB" ให้อ่านง่ายเหมือนตารางของร้านค้า (ค่าที่ไม่เข้ารูปแบบนี้แสดงตามเดิม)
+function formatCacheSize(value) {
+  const match = String(value ?? '').trim().match(/^(\d+(?:\.\d+)?)\s*(KB|MB|GB)$/i);
+  return match ? `${match[1]} ${match[2].toUpperCase()}` : String(value ?? '');
+}
+
+function openProductDetailModal(product) {
+  if (!productDetailModalEl) {
+    return;
+  }
+
+  const imageUrl = getSafeImageUrl(product.imageUrl);
+  if (productDetailMediaEl) {
+    productDetailMediaEl.innerHTML = imageUrl
+      ? `<img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(product.name)}" loading="lazy" />`
+      : `<div class="image-placeholder" data-category="${escapeHtml(product.category)}">${getCategoryIcon(product.category)}<span>${escapeHtml(getCategoryLabel(product.category))}</span></div>`;
+  }
+
+  if (productDetailTagsEl) {
+    productDetailTagsEl.innerHTML = `
+      <span class="tag tag-category">${escapeHtml(getCategoryLabel(product.category))}</span>
+      <span class="tag tag-brand">${escapeHtml(product.brand || 'ไม่ระบุแบรนด์')}</span>
+    `;
+  }
+
+  if (productDetailNameEl) {
+    productDetailNameEl.textContent = product.name || '';
+  }
+
+  if (productDetailPriceEl) {
+    productDetailPriceEl.textContent = formatCurrency(product.price);
+  }
+
+  const specs = buildProductDetailSpecs(product);
+  if (productDetailSpecsEl) {
+    productDetailSpecsEl.innerHTML = specs
+      .map(([label, value]) => `<tr><th scope="row">${escapeHtml(label)}</th><td>${escapeHtml(value)}</td></tr>`)
+      .join('');
+  }
+
+  // ซีพียูบางตัวที่ยังไม่ได้ import สเปคเข้ามา (ดู server/scripts/apply-cpu-specs.js)
+  // จะไม่มี specs อื่นนอกจาก Socket เลย - แจ้งให้รู้ตรงๆ แทนที่จะโชว์กล่องว่างเฉยๆ
+  // สำหรับซีพียูที่ยังไม่เคยรัน apply-cpu-detailed-specs.js หรือรันแล้วแต่รุ่นนี้ไม่มี
+  // ในชุดข้อมูลอ้างอิง (ดูคอมเมนต์หัวสคริปต์) จะไม่มี Threads/Cache/Thermal Solution เลย
+  // แจ้งให้รู้ตรงๆ แทนที่จะให้ดูเหมือนลืมใส่
+  if (productDetailNoteEl) {
+    if (!specs.length) {
+      productDetailNoteEl.textContent = 'ยังไม่มีข้อมูลสเปคเชิงลึกสำหรับสินค้านี้ในระบบ';
+      productDetailNoteEl.hidden = false;
+    } else if (product.category === 'cpu' && !product.threads) {
+      productDetailNoteEl.textContent = 'หมายเหตุ: สินค้ารุ่นนี้ยังไม่มีข้อมูล Threads/Cache/ชุดระบายความร้อนในระบบ (ยังไม่พบในแหล่งข้อมูลอ้างอิงที่ใช้)';
+      productDetailNoteEl.hidden = false;
+    } else {
+      productDetailNoteEl.textContent = '';
+      productDetailNoteEl.hidden = true;
+    }
+  }
+
+  productDetailModalEl.hidden = false;
+  requestAnimationFrame(() => productDetailCloseButton?.focus());
+}
+
+function closeProductDetailModal() {
+  if (productDetailModalEl) {
+    productDetailModalEl.hidden = true;
+  }
 }
 
 function handleCartAction(event) {
@@ -2673,7 +3200,7 @@ function clearCart() {
 function resetCurrentBuild() {
   state.category = '';
   state.search = '';
-  state.filters = { brand: '', series: '', socket: '' };
+  state.filters = createEmptyFilters();
   state.cartItems = [];
   state.currentBuild = null;
   state.pendingListed = false;

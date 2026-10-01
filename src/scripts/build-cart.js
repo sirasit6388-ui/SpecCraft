@@ -116,6 +116,17 @@ function clampQuantity(value) {
 }
 
 function normalizeCartItem(item) {
+  // จอ: เก็บฟิลด์ที่ใช้ทำข้อความสรุปใต้ชื่อในตะกร้า (ขนาด/ชนิดแผง/ความละเอียด/รีเฟรชเรต)
+  // เพิ่มเฉพาะหมวด monitor เพื่อไม่ให้รูปแบบของหมวดอื่นเปลี่ยนไปจากเดิม
+  const monitorSpecs = item.category === 'monitor'
+    ? {
+        screenSizeInch: item.screenSizeInch ?? null,
+        panelType: item.panelType || '',
+        resolution: Array.isArray(item.resolution) ? item.resolution.slice(0, 2) : item.resolution || null,
+        refreshRate: item.refreshRate ?? null
+      }
+    : {};
+
   return {
     id: item.id,
     category: item.category,
@@ -131,6 +142,7 @@ function normalizeCartItem(item) {
     memoryType: item.memoryType || '',
     memoryGb: item.memoryGb || null,
     wattage: item.wattage || null,
-    quantity: clampQuantity(item.quantity)
+    quantity: clampQuantity(item.quantity),
+    ...monitorSpecs
   };
 }

@@ -240,6 +240,161 @@ select:focus-visible {
   justify-content: flex-end;
 }
 
+/* กล่อง "ดูรายละเอียด" ของสินค้า (สเปคเชิงลึก เช่น Socket/จำนวนคอร์/ความเร็ว/TDP/
+   กราฟิกในตัว) เปิดจากปุ่ม .product-detail-trigger บนการ์ดสินค้าทุกใบ โครงสร้าง
+   เดียวกับ .auth-modal/.confirm-modal (overlay เต็มจอ + กล่องตรงกลาง) */
+.product-detail-modal {
+  align-items: center;
+  background: rgba(17, 24, 39, 0.58);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 24px;
+  position: fixed;
+  z-index: 50;
+}
+
+.product-detail-modal[hidden] {
+  display: none;
+}
+
+.product-detail-dialog {
+  background: #ffffff;
+  border-radius: 18px;
+  box-shadow: 0 24px 80px rgba(17, 24, 39, 0.28);
+  display: grid;
+  gap: 22px;
+  grid-template-columns: minmax(0, 220px) minmax(0, 1fr);
+  max-height: min(90vh, 820px);
+  max-width: 760px;
+  overflow-y: auto;
+  padding: 30px;
+  position: relative;
+  width: min(100%, 760px);
+}
+
+.product-detail-close {
+  align-items: center;
+  background: #a3a3a3;
+  border: 0;
+  border-radius: 999px;
+  color: #ffffff;
+  cursor: pointer;
+  display: flex;
+  font-size: 2rem;
+  font-weight: 900;
+  height: 38px;
+  justify-content: center;
+  line-height: 1;
+  position: absolute;
+  right: 14px;
+  top: 14px;
+  width: 38px;
+}
+
+.product-detail-media {
+  align-items: center;
+  background: #f7f7f8;
+  border-radius: 12px;
+  display: flex;
+  justify-content: center;
+  min-height: 160px;
+  overflow: hidden;
+  padding: 14px;
+}
+
+.product-detail-media img {
+  height: 100%;
+  object-fit: contain;
+  width: 100%;
+}
+
+.product-detail-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.product-detail-body h2 {
+  font-size: 1.2rem;
+  line-height: 1.4;
+  margin: 0 0 10px;
+  padding-right: 30px;
+}
+
+.product-detail-price {
+  color: var(--maroon);
+  font-size: 1.3rem;
+  font-weight: 900;
+  margin-bottom: 16px;
+}
+
+.product-detail-spec-section {
+  grid-column: 1 / -1;
+}
+
+.product-detail-spec-section h3 {
+  font-size: 1.2rem;
+  margin: 4px 0 12px;
+}
+
+/* ตารางสเปคแบบเดียวกับหน้าสินค้าของร้านค้า: ชื่อฟิลด์สีเทาด้านซ้าย ค่าด้านขวา แถวสลับสี */
+.product-detail-specs {
+  border-collapse: collapse;
+  font-size: 0.92rem;
+  width: 100%;
+}
+
+.product-detail-specs tr:nth-child(odd) {
+  background: #f5f5f6;
+}
+
+.product-detail-specs th,
+.product-detail-specs td {
+  padding: 12px 16px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.product-detail-specs th {
+  color: #6b6b6b;
+  font-weight: 500;
+  width: 38%;
+}
+
+.product-detail-specs td {
+  color: #1f1f1f;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.product-detail-note {
+  color: #8a8a8a;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  margin: 14px 0 0;
+}
+
+.product-detail-note[hidden] {
+  display: none;
+}
+
+@media (max-width: 560px) {
+  .product-detail-dialog {
+    grid-template-columns: 1fr;
+  }
+
+  .product-detail-specs th,
+  .product-detail-specs td {
+    padding: 10px 12px;
+  }
+
+  .product-detail-specs th {
+    width: 48%;
+  }
+}
+
 .auth-close {
   align-items: center;
   background: #a3a3a3;
@@ -288,6 +443,16 @@ select:focus-visible {
 .auth-form label {
   display: grid;
   gap: 7px;
+}
+
+.auth-form label[hidden] {
+  display: none;
+}
+
+/* ในหน้าต่างล็อกอินให้เรียงคอลัมน์เดียวเสมอ - กฎ 2 คอลัมน์ของ .auth-form ในจอกลาง
+   เป็นของเดิมสมัยที่ฟอร์มอยู่บนแถบหัว พอมีช่องที่ 4 (อีเมล) แล้วช่องจะเรียงเพี้ยน */
+.auth-dialog .auth-form {
+  grid-template-columns: 1fr;
 }
 
 .auth-form label span {
@@ -2626,17 +2791,27 @@ h1 {
   cursor: default;
 }
 
-.product-detail-link {
+.product-detail-trigger {
+  background: none;
+  border: 0;
   color: var(--maroon);
+  cursor: pointer;
   display: block;
   font-size: 0.82rem;
   font-weight: 700;
   margin-top: 8px;
+  min-height: auto;
+  padding: 4px;
   text-align: center;
   text-decoration: none;
+  width: 100%;
 }
 
-.product-detail-link:hover {
+.product-card button.product-detail-trigger,
+.product-card button.product-detail-trigger:hover {
+  background: none;
+  border: 0;
+  color: var(--maroon);
   text-decoration: underline;
 }
 
@@ -3312,4 +3487,64 @@ body {
   .product-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* ---- การ์ดจอมอนิเตอร์: บรรทัดสรุปสเปคใต้ชื่อ + ราคาปกติขีดฆ่า/ส่วนลด ---- */
+.product-spec-line {
+  color: #6b7280;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  margin: 2px 0 6px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.price-row {
+  align-items: baseline;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+
+.price-row .price {
+  margin: 0;
+}
+
+.price-list {
+  color: #9ca3af;
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.price-discount {
+  color: #dc2626;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+/* ---- ป้าย/ตัวกรอง "มีขายในไทย" (หมวดจอ) ---- */
+.tag-th-yes {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.tag-th-no {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.filters label[hidden] {
+  display: none;
+}
+
+/* ---- หมวดจอ: ตัวกรองสเปค 4 ช่อง (Hz/ขนาด/ความละเอียด/ชนิดแผง) + แบรนด์ + ปุ่มล้าง จัดแถวอัตโนมัติ ไม่ให้ช่องใดล้นขอบ ---- */
+.filters.filters-monitor {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.filters.filters-monitor select {
+  min-width: 0;
+  width: 100%;
 }

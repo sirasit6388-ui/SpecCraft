@@ -13,8 +13,8 @@
          elevation pass" display font (hero h1 / section h2 only, per
          request) - loaded the same way. -->
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=Noto+Serif+Thai:wght@600;700&display=swap" />
-    <link rel="stylesheet" href="./styles/main.css?v=4" />
-    <link rel="stylesheet" href="./styles/theme-soft.css?v=24" />
+    <link rel="stylesheet" href="./styles/main.css?v=12" />
+    <link rel="stylesheet" href="./styles/theme-soft.css?v=25" />
   </head>
   <body>
     <header class="topbar">
@@ -66,6 +66,10 @@
           <button type="button" data-auth-mode="register">สมัครสมาชิก</button>
         </div>
         <form class="auth-form" data-auth-form>
+          <label data-auth-register-only hidden>
+            <span>อีเมล</span>
+            <input name="email" type="email" autocomplete="email" inputmode="email" maxlength="254" placeholder="อีเมล" />
+          </label>
           <label>
             <span>ชื่อผู้ใช้</span>
             <input name="username" autocomplete="username" placeholder="ชื่อผู้ใช้" />
@@ -97,6 +101,25 @@
           <button class="secondary-button" type="button" data-confirm-cancel>ยกเลิก</button>
           <button class="primary-button" type="button" data-confirm-ok>ยืนยัน</button>
         </div>
+      </div>
+    </section>
+
+    <section class="product-detail-modal" data-product-detail-modal hidden>
+      <div class="product-detail-dialog">
+        <button class="product-detail-close" type="button" data-product-detail-close aria-label="ปิด">×</button>
+        <div class="product-detail-media" data-product-detail-media></div>
+        <div class="product-detail-body">
+          <div class="product-detail-tags" data-product-detail-tags></div>
+          <h2 data-product-detail-name></h2>
+          <div class="product-detail-price" data-product-detail-price></div>
+        </div>
+        <section class="product-detail-spec-section">
+          <h3>คุณสมบัติสินค้า</h3>
+          <table class="product-detail-specs">
+            <tbody data-product-detail-specs></tbody>
+          </table>
+          <p class="product-detail-note" data-product-detail-note hidden></p>
+        </section>
       </div>
     </section>
 
@@ -204,16 +227,40 @@
               <option value="">แบรนด์ทั้งหมด</option>
             </select>
           </label>
-          <label>
+          <label data-filter-not-monitor>
             <span>ซีรีส์</span>
             <select name="series" data-filter-series>
               <option value="">ซีรีส์ทั้งหมด</option>
             </select>
           </label>
-          <label>
+          <label data-filter-not-monitor>
             <span>ซ็อกเก็ต</span>
             <select name="socket" data-filter-socket>
               <option value="">ซ็อกเก็ตทั้งหมด</option>
+            </select>
+          </label>
+          <label data-filter-monitor-only hidden>
+            <span>รีเฟรชเรต (Hz)</span>
+            <select name="minRefreshRate" autocomplete="off" data-filter-refresh-rate>
+              <option value="">ทั้งหมด</option>
+            </select>
+          </label>
+          <label data-filter-monitor-only hidden>
+            <span>ขนาดหน้าจอ</span>
+            <select name="screenSize" autocomplete="off" data-filter-screen-size>
+              <option value="">ทั้งหมด</option>
+            </select>
+          </label>
+          <label data-filter-monitor-only hidden>
+            <span>ความละเอียด</span>
+            <select name="resolution" autocomplete="off" data-filter-resolution>
+              <option value="">ทั้งหมด</option>
+            </select>
+          </label>
+          <label data-filter-monitor-only hidden>
+            <span>ชนิดแผง</span>
+            <select name="panelType" autocomplete="off" data-filter-panel-type>
+              <option value="">ทั้งหมด</option>
             </select>
           </label>
           <button type="reset">ล้างตัวกรอง</button>
@@ -382,6 +429,6 @@
       </section>
     </main>
 
-    <script type="module" src="./main.js?v=12"></script>
+    <script type="module" src="./main.js?v=30"></script>
   </body>
 </html>
