@@ -178,3 +178,33 @@ test('POST /api/build/recommend forwards includeMonitor as a strict boolean, def
   await route(createJsonRequest('/api/build/recommend', { mode: 'gaming', budget: 50000, includeMonitor: 'true' }), createMockResponse());
   assert.equal(seen.includeMonitor, false); // ไม่ใช่ boolean จริง ถือเป็น false (กัน truthy string หลุดเข้ามา)
 });
+
+// ---- /api/build/check: re-check an edited build ----
+test('POST /api/build/check returns the same derived fields as a recommendation, with input limits', async () => {
+  const route = createBuilderRoutes();
+  const items = [
+    { id: 1, category: 'cpu', name: 'AMD Ryzen 5 5600 AM4', socket: 'AM4', price: 3200, tdp: 65 },
+    { id: 2, category: 'motherboard', name: 'B550 AM4 DDR4', socket: 'AM4', memoryType: 'DDR4', formFactor: 'ATX', price: 2900 },
+    { id: 3, category: 'not-a-category', name: 'ignored', price: 1 }
+  ];
+
+  const ok = createMockResponse();
+  await route(createJsonRequest('/api/build/check', { items }), ok);
+  assert.equal(ok.statusCode, 200);
+  const body = JSON.parse(ok.body);
+  assert.ok(body.check.compatibility, 'มีผลตรวจความเข้ากันได้');
+  assert.ok(Array.isArray(body.check.compatibility.checks));
+  assert.ok('requiredPsuWattage' in body.check);
+
+  const tooMany = createMockResponse();
+  await route(createJsonRequest('/api/build/check', { items: Array.from({ length: 31 }, (_, i) => ({ id: i, category: 'cpu' })) }), tooMany);
+  assert.equal(tooMany.statusCode, 400);
+
+  const notArray = createMockResponse();
+  await route(createJsonRequest('/api/build/check', { items: 'x' }), notArray);
+  assert.equal(notArray.statusCode, 400);
+
+  const missingCpu = createMockResponse();
+  await route(createJsonRequest('/api/build/check', { items: [items[1]] }), missingCpu);
+  assert.equal(missingCpu.statusCode, 200); // สเปคไม่ครบก็ตรวจได้ ไม่ error
+});

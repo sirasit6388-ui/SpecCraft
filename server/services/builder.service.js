@@ -157,22 +157,9 @@ async function buildRecommendationOnce(options, includeMonitor) {
     throw new Error('Cannot create a complete build within the selected budget');
   }
 
-  const socket = inferCpuSocket(items.find((item) => item.category === 'cpu'));
-  const motherboard = items.find((item) => item.category === 'motherboard');
-  const selectedCase = items.find((item) => item.category === 'case');
-  const selectedGpu = items.find((item) => item.category === 'video-card');
-  const memoryType = inferMemoryType(motherboard);
-  const motherboardFormFactor = inferMotherboardFormFactor(motherboard);
-  const caseSupport = inferCaseSupport(selectedCase);
-  const gpuLength = inferGpuLength(selectedGpu);
-  const caseGpuClearance = inferCaseGpuClearance(selectedCase);
-  const selectedCpuCooler = items.find((item) => item.category === 'cpu-cooler');
-  const cpuCoolerHeight = inferCpuCoolerHeight(selectedCpuCooler);
-  const caseCpuCoolerClearance = inferCaseCpuCoolerClearance(selectedCase);
-  const requiredPsuWattage = calculateRequiredPsuWattage(items);
-  const compatibility = createCompatibilityReport(items);
+  const description = describeBuild(items);
 
-  if (compatibility.failures) {
+  if (description.compatibility.failures) {
     throw new Error('Cannot create a compatible build from the available products');
   }
 
@@ -180,22 +167,36 @@ async function buildRecommendationOnce(options, includeMonitor) {
     mode: plan.mode,
     budget: plan.budget,
     cpuBrand: cpuBrand || 'auto',
-    socket,
-    memoryType,
-    motherboardFormFactor,
-    caseSupport,
-    gpuLength,
-    caseGpuClearance,
-    cpuCoolerHeight,
-    caseCpuCoolerClearance,
-    requiredPsuWattage,
-    compatibility,
+    ...description,
     total,
     remaining: plan.budget - total,
     monitorRequested: includeMonitor,
     monitorIncluded: items.some((item) => item.category === 'monitor'),
     notices: [],
     items
+  };
+}
+
+// ข้อมูลสรุปของชุดสเปค (ซ็อกเก็ต ชนิดแรม ขนาดเมนบอร์ด เคสที่รองรับ กำลังไฟขั้นต่ำ และผลตรวจความเข้ากันได้)
+// ใช้ทั้งตอนจัดสเปคอัตโนมัติ และตอนผู้ใช้แก้สเปคต่อเองแล้วหน้าเว็บขอตรวจใหม่ (/api/build/check)
+export function describeBuild(items = []) {
+  const list = Array.isArray(items) ? items : [];
+  const motherboard = list.find((item) => item.category === 'motherboard');
+  const selectedCase = list.find((item) => item.category === 'case');
+  const selectedGpu = list.find((item) => item.category === 'video-card');
+  const selectedCpuCooler = list.find((item) => item.category === 'cpu-cooler');
+
+  return {
+    socket: inferCpuSocket(list.find((item) => item.category === 'cpu')),
+    memoryType: inferMemoryType(motherboard),
+    motherboardFormFactor: inferMotherboardFormFactor(motherboard),
+    caseSupport: inferCaseSupport(selectedCase),
+    gpuLength: inferGpuLength(selectedGpu),
+    caseGpuClearance: inferCaseGpuClearance(selectedCase),
+    cpuCoolerHeight: inferCpuCoolerHeight(selectedCpuCooler),
+    caseCpuCoolerClearance: inferCaseCpuCoolerClearance(selectedCase),
+    requiredPsuWattage: calculateRequiredPsuWattage(list),
+    compatibility: createCompatibilityReport(list)
   };
 }
 

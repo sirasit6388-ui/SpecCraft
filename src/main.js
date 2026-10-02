@@ -2461,6 +2461,7 @@ async function submitBuildForm(event) {
       body: JSON.stringify(payload)
     });
 
+    state.lastBuild = null;
     renderBuildResult(data.build);
     setCartItems(
       data.build.items || [],
@@ -2468,6 +2469,8 @@ async function submitBuildForm(event) {
         ? 'เติมสเปคจากระบบอัตโนมัติแล้ว (ไม่มีจอ ดูเหตุผลด้านบน)'
         : 'เติมสเปคจากระบบอัตโนมัติแล้ว'
     );
+    // จำผลจัดอัตโนมัติไว้ เพื่อให้กรอบ "สเปคที่ระบบแนะนำ" อัปเดตตามเมื่อผู้ใช้แก้สเปคต่อเอง (ดู syncBuildResultWithCart)
+    state.lastBuild = { build: data.build, signature: getCartSignature(state.cartItems) };
   } catch (error) {
     buildResultEl.innerHTML = createEmptyState({
       title: 'จัดสเปคไม่ได้',
@@ -2493,7 +2496,7 @@ function renderBuildResult(build) {
     <div class="build-result-header">
       <div>
         <p class="eyebrow">${build.mode === 'gaming' ? 'เล่นเกม' : 'ทำงาน'} / CPU ${build.cpuBrand === 'auto' ? 'อัตโนมัติ' : build.cpuBrand}</p>
-        <h3>สเปคที่ระบบแนะนำ</h3>
+        <h3>สเปคที่ระบบแนะนำ${build.edited ? ' <span class="build-edited-tag">แก้ไขแล้ว</span>' : ''}</h3>
       </div>
       <div class="build-total">
         <span>รวม</span>
@@ -2510,6 +2513,8 @@ function renderBuildResult(build) {
       ${build.requiredPsuWattage ? `<span>PSU ขั้นต่ำ ${formatNumber(build.requiredPsuWattage)}W</span>` : ''}
       <span>${build.remaining >= 0 ? `เหลือ ${formatCurrency(build.remaining)}` : `เกินงบ ${formatCurrency(Math.abs(build.remaining))}`}</span>
     </div>
+    ${build.checking ? '<p class="build-checking">กำลังตรวจสอบความเข้ากันได้ของสเปคที่แก้ไข...</p>' : ''}
+    ${build.checkFailed ? '<p class="build-checking">ตรวจสอบความเข้ากันได้ไม่สำเร็จ ลองแก้สเปคอีกครั้ง</p>' : ''}
     ${renderCompatibilityReport(build.compatibility)}
     ${renderBuildItemsDiagram(build.items)}
   `;
@@ -2524,8 +2529,8 @@ function renderBuildItemsDiagram(items) {
     <article class="build-item" data-category="${escapeHtml(item.category)}">
       <span>${getCategoryLabel(item.category)}</span>
       <div>
-        <strong>${escapeHtml(item.name)}${renderItemDetail(item)}</strong>
-        <b>${formatCurrency(item.price)}</b>
+        <strong>${escapeHtml(item.name)}${(item.quantity || 1) > 1 ? ` × ${item.quantity}` : ''}${renderItemDetail(item)}</strong>
+        <b>${formatCurrency(item.price * (item.quantity || 1))}</b>
       </div>
     </article>
   `;
@@ -2718,6 +2723,7 @@ function getSafeImageUrl(value) {
 function renderCart() {
   if (!cartItemsEl || !cartTotalEl) {
     localStorage.setItem('pc-build-cart', JSON.stringify(state.cartItems));
+    syncBuildResultWithCart();
     return;
   }
 
@@ -2756,6 +2762,79 @@ function renderCart() {
 
   cartTotalEl.textContent = formatCurrency(calculateCartTotal(state.cartItems));
   localStorage.setItem('pc-build-cart', JSON.stringify(state.cartItems));
+  syncBuildResultWithCart();
+}
+
+// ลายเซ็นของตะกร้า (หมวด/สินค้า/จำนวน) ใช้ตรวจว่าผู้ใช้แก้สเปคไปจากที่ระบบจัดให้หรือยัง
+function getCartSignature(items) {
+  return (items || [])
+    .map((item) => `${item.category}:${item.id ?? item.name}:${item.quantity || 1}`)
+    .sort()
+    .join('|');
+}
+
+let buildCheckSequence = 0;
+
+// เมื่อผู้ใช้ลบ/เพิ่ม/เปลี่ยนสินค้าในสเปคหลังจัดอัตโนมัติ ให้กรอบ "สเปคที่ระบบแนะนำ" แสดงตามสเปคปัจจุบัน
+// (รายการ ราคารวม เงินคงเหลือ และผลตรวจความเข้ากันได้ที่ขอตรวจใหม่จากเซิร์ฟเวอร์)
+function syncBuildResultWithCart() {
+  const last = state.lastBuild;
+
+  if (!last || !buildResultEl || buildResultEl.hidden) {
+    return;
+  }
+
+  if (!state.cartItems.length) {
+    buildResultEl.hidden = true;
+    buildResultEl.innerHTML = '';
+    state.lastBuild = null;
+    return;
+  }
+
+  // ยังไม่ได้แก้อะไร: แสดงผลเดิมจากระบบอัตโนมัติ
+  if (getCartSignature(state.cartItems) === last.signature) {
+    renderBuildResult(last.build);
+    return;
+  }
+
+  // เรียงตามลำดับหมวดมาตรฐาน (CPU, เมนบอร์ด, การ์ดจอ, ...) ไม่ใช่ตามลำดับที่ผู้ใช้เพิ่ม
+  const order = (category) => {
+    const index = manualCategoryOrder.indexOf(category);
+    return index === -1 ? manualCategoryOrder.length : index;
+  };
+  const items = state.cartItems.map((item) => ({ ...item })).sort((a, b) => order(a.category) - order(b.category));
+  const total = calculateCartTotal(state.cartItems);
+  const draft = {
+    ...last.build,
+    edited: true,
+    notices: [],
+    items,
+    total,
+    remaining: last.build.budget - total,
+    compatibility: null,
+    checking: true
+  };
+
+  renderBuildResult(draft);
+
+  const sequence = ++buildCheckSequence;
+
+  fetchJson('/api/build/check', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ items })
+  }).then((data) => {
+    // มีการแก้รอบใหม่ระหว่างรอผล: ทิ้งผลเก่า
+    if (sequence !== buildCheckSequence || state.lastBuild !== last) {
+      return;
+    }
+
+    renderBuildResult({ ...draft, ...data.check, checking: false });
+  }).catch(() => {
+    if (sequence === buildCheckSequence && state.lastBuild === last) {
+      renderBuildResult({ ...draft, checking: false, checkFailed: true });
+    }
+  });
 }
 
 // ความละเอียดจอ: ฐานข้อมูลเก็บเป็น [กว้าง, สูง] -> "1920 x 1080" (รับสตริงที่เป็นข้อความอยู่แล้วด้วย)
@@ -3256,6 +3335,8 @@ function resetCurrentBuild() {
   searchForm.reset();
   filterForm.reset();
   buildForm.reset();
+
+  state.lastBuild = null;
 
   if (buildResultEl) {
     buildResultEl.hidden = true;
